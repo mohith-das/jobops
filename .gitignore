@@ -34,6 +34,9 @@ career-ops/**
 *.pdf
 *.xlsx
 *.xls
+# Exception: the user guide PDF ships with the repo so the README link works
+# and users without a TeX install can read the docs.
+!docs/user-guide.pdf
 Connections.csv
 Connections*.csv
 **/Connections.csv

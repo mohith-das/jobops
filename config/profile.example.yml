@@ -1,0 +1,67 @@
+# job_ops-mcp profile configuration.
+#
+# Copy to `config/profile.yml` (or let `npx job_ops-mcp init` do it) and fill in your
+# details. This is the source of truth for your identity + targeting + comp/location
+# preferences. The chat reads it via the rubric + career_packet resources.
+
+candidate:
+  full_name:     "<Your Full Name>"
+  email:         "<you@example.com>"
+  phone:         "<+country area-number>"
+  location:      "<City, State / Country>"
+  linkedin:      "linkedin.com/in/<your-handle>"
+  portfolio_url: "https://<your-portfolio>"
+  github:        "github.com/<your-handle>"
+  twitter:       ""    # optional
+
+target_roles:
+  # Your North-Star roles — what you're optimizing for.
+  primary:
+    - "<role title 1>"
+    - "<role title 2>"
+  # Archetypes drive scoring (`role_category`) + tailoring per JD.
+  # fit values: primary | secondary | adjacent
+  archetypes:
+    - { name: "<archetype label, e.g. AI/ML Engineer>", level: "Senior",      fit: "primary"   }
+    - { name: "<archetype label, e.g. Technical PM>",   level: "Senior/Staff",fit: "secondary" }
+    - { name: "<archetype label, e.g. Forward-Deployed>",level: "Mid-Senior", fit: "adjacent"  }
+
+narrative:
+  # One-line professional headline.
+  headline:   "<your one-line headline>"
+  # Two-sentence story about what makes you uniquely hireable.
+  exit_story: "<your story>"
+  # Top 3–5 differentiators (used in score reasoning + outreach hooks).
+  superpowers:
+    - "<superpower 1>"
+    - "<superpower 2>"
+    - "<superpower 3>"
+  # The 2–4 things that excite you (used in taste_fit scoring).
+  likes:
+    - "<like 1, e.g. 'lean teams, fast iteration, AI/data tooling'>"
+    - "<like 2>"
+  # The dislikes that should drop taste_fit below 50.
+  dislikes:
+    - "<dislike 1, e.g. 'legacy Java enterprise modernization'>"
+    - "<dislike 2>"
+  # Proof points — projects/articles/case studies with measurable impact.
+  proof_points:
+    - { name: "<project name>", url: "<url>", hero_metric: "<short hero-metric phrase>" }
+    - { name: "<project name>", url: "<url>", hero_metric: "<...>" }
+
+compensation:
+  target_range:         "<currency-min – currency-max>"   # e.g. "$130K-180K"
+  currency:             "USD"
+  minimum:              "<walk-away number>"
+  location_flexibility: "<e.g. 'Remote preferred; 1 week/month on-site possible'>"
+
+location:
+  country:              "<country>"
+  city:                 "<city>"
+  timezone:             "<TZ abbr, e.g. PST>"
+  visa_status:          "<e.g. 'No sponsorship needed' or 'On OPT, need H1B sponsorship'>"
+  # Optional. If your target locations differ from `city`, list them here.
+  onsite_availability:  ""
+
+cv:
+  output_format: "html"   # "html" (default) or "latex"

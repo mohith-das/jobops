@@ -1,0 +1,62 @@
+# Node / build
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config (private to the user; only the .example variants get committed)
+cv.md
+config/profile.yml
+portals.yml
+.env
+.env.local
+
+# ── EXPLICIT EXCLUSIONS (NEVER COMMIT — by-name, in addition to the patterns below) ──
+# These are called out by name so a future glob loosening can't accidentally let them
+# through. Removing any line here is intentional and reviewable.
+jsa_study_guide.pdf
+career-ops/
+career-ops/**
+
+# SQLite databases (rated jobs, LinkedIn connections, H1B filings — personal data)
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.db-journal
+
+# All PDFs / spreadsheets / LinkedIn exports (anywhere in the tree)
+*.pdf
+*.xlsx
+*.xls
+Connections.csv
+Connections*.csv
+**/Connections.csv
+**/Connections*.csv
+
+# DOL OFLC H1B disclosure files
+*.csv
+**/h1b_*.csv
+**/LCA_Disclosure_Data_*.csv
+
+# Runtime state directories
+data/
+output/
+reports/
+
+# Playwright browser cache (varies per OS)
+.playwright/
+.cache/ms-playwright/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local state (per-user, contains absolute paths)
+.claude/settings.local.json

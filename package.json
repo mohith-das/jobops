@@ -1,0 +1,67 @@
+{
+  "name": "job_ops-mcp",
+  "version": "0.3.0",
+  "description": "Self-hosted MCP server for the full job-search loop: portal scanning, JD evaluation, tailored resume + cover PDFs, outreach drafting, story bank, negotiation brief — chat-driven, human-in-the-loop.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "homepage": "https://github.com/mohith-das/job_ops-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohith-das/job_ops-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mohith-das/job_ops-mcp/issues"
+  },
+  "keywords": [
+    "mcp", "model-context-protocol", "claude", "job-search", "resume",
+    "cover-letter", "ats", "career", "agent", "playwright"
+  ],
+  "bin": {
+    "job_ops-mcp": "dist/cli.js",
+    "job-ops-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "modes/",
+    "templates/",
+    "fonts/",
+    "cv.example.md",
+    "config/profile.example.yml",
+    "portals.example.yml",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node -e \"const{cpSync,existsSync,mkdirSync}=require('fs');mkdirSync('dist/migrations',{recursive:true});cpSync('src/migrations','dist/migrations',{recursive:true});\"",
+    "start": "node dist/cli.js start",
+    "init": "node dist/cli.js init",
+    "doctor": "node dist/cli.js doctor",
+    "connect": "node dist/cli.js connect",
+    "dev": "tsx watch src/cli.ts start",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "playwright:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.21.0",
+    "js-yaml": "^4.1.0",
+    "playwright": "^1.48.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.7.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

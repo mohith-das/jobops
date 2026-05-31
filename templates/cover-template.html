@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{NAME}} — Cover Letter</title>
+<style>
+  @font-face {
+    font-family: 'DM Sans';
+    src: url('./fonts/dm-sans-latin.woff2') format('woff2');
+    font-weight: 100 1000;
+    font-style: normal;
+    font-display: swap;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+  .page { max-width: 7.4in; margin: 0 auto; padding: 0; }
+  .header { margin-bottom: 22px; }
+  .header h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px 0;
+  }
+  .header-gradient {
+    height: 2px;
+    background: linear-gradient(to right, hsl(187, 74%, 32%), hsl(270, 70%, 45%));
+    border-radius: 1px;
+    margin-bottom: 8px;
+  }
+  .contact { color: #555; font-size: 10.5px; }
+  .meta { color: #555; font-size: 10.5px; margin-bottom: 18px; }
+  .salutation { margin-bottom: 12px; }
+  .body p { margin: 0 0 10px 0; }
+  .closing { margin-top: 14px; }
+  .signature { margin-top: 22px; font-weight: 600; }
+  @media print { .page { padding: 0; } }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>{{NAME}}</h1>
+      <div class="header-gradient"></div>
+      <div class="contact">{{CONTACT_LINE}}</div>
+    </div>
+    <div class="meta">
+      <div>{{DATE}}</div>
+      <div>{{COMPANY}}{{COMPANY_LOCATION}}</div>
+    </div>
+    <div class="salutation">Dear Hiring Manager,</div>
+    <div class="body">{{BODY}}</div>
+    <div class="closing">Best regards,</div>
+    <div class="signature">{{NAME}}</div>
+  </div>
+</body>
+</html>

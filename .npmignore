@@ -1,0 +1,29 @@
+# NOTE: `package.json files[]` is the authoritative allowlist for `npm pack`.
+# This file is documentation + a second line of defence in case `files[]` is ever
+# loosened.
+
+src/
+career-ops/
+data/
+output/
+reports/
+node_modules/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.csv
+.env
+.env.local
+.git/
+.github/
+.gitignore
+.DS_Store
+.claude/
+.vscode/
+.idea/
+jsa_study_guide.pdf
+tsconfig.json
+cv.md
+config/profile.yml
+portals.yml

@@ -24,7 +24,7 @@ export interface BootOptions {
 export async function bootServer(opts: BootOptions = {}): Promise<void> {
   // Migrations + first-run seeding (side-effect of getDb()).
   getDb();
-  const seed = ensureActiveCareerPacket();
+  const seed = await ensureActiveCareerPacket();
   const files = loadProjectFiles();
 
   const app = buildHttpApp();

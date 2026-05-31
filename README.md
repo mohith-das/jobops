@@ -20,22 +20,42 @@ npx job_ops-mcp init
 
 # 2. Open cv.md, config/profile.yml, portals.yml and replace every <TODO> placeholder.
 
-# 3. Confirm everything is wired
+# 3. Rebuild the career_packet from your now-real cv.md
+#    (or just re-run `init` — it auto-reseeds when it detects cv.md changed)
+npx job_ops-mcp reseed
+
+# 4. Confirm everything is wired
 npx job_ops-mcp doctor
 
-# 4. Boot the server (Chromium auto-installs on first run)
+# 5. Boot the server (Chromium auto-installs on first run)
 npx job_ops-mcp start
 #  ▷ job_ops-mcp listening on http://127.0.0.1:7891
 
-# 5. Get a copy-paste config block for your MCP client
+# 6. Get a copy-paste config block for your MCP client
 npx job_ops-mcp connect
 
-# 6. Paste a job URL or pasted JD into your chat — the chat calls evaluate_job, draws on
+# 7. Paste a job URL or pasted JD into your chat — the chat calls evaluate_job, draws on
 #    your rubric + career_packet + tailoring rules, and walks the rest of the workflow.
 ```
 
 That's the loop. Everything else (warm-intro finder, story bank, negotiation brief,
 batch rater, scheduler, …) is wired in but optional.
+
+### The edit-cv.md loop
+
+Your `career_packet` is the source of truth the chat uses to score JDs and draft
+materials. It's built from `cv.md` + `config/profile.yml`. Whenever you edit `cv.md`,
+**re-run reseed** so the chat sees the new bullets:
+
+```bash
+# After any edit to cv.md:
+npx job_ops-mcp reseed
+```
+
+`reseed` writes a NEW active version (the previous version is demoted, history kept).
+The chat can also call the `reseed_career_packet` MCP tool to do the same thing without
+leaving the conversation. `doctor` warns when `cv.md` changed since the last reseed, and
+`init` auto-reseeds when it detects the mismatch.
 
 ---
 

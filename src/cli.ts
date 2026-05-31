@@ -89,11 +89,28 @@ async function cmdInit(flags: Map<string, string | boolean>) {
     const { config: cfg } = await import('./config.js');
     const { getDb } = await import('./db.js');
     getDb();
-    const { ensureActiveCareerPacket } = await import('./core/profile.js');
-    const seed = ensureActiveCareerPacket();
+    const {
+      ensureActiveCareerPacket, getActiveCareerPacket,
+      loadProjectFiles, packetStatus, seedCareerPacketFromFiles,
+    } = await import('./core/profile.js');
+    const seed = await ensureActiveCareerPacket();
     console.log(`\n  ${tick()} data dir: ${cfg.dataDir}`);
     console.log(`  ${tick()} SQLite migrations applied`);
     console.log(`  ${tick()} career_packet ${seed.created ? 'seeded' : 'present'} (v${seed.version})`);
+
+    // Stale check: cv.md was edited after the last reseed? Rebuild and tell the user
+    // clearly. The previous active row is demoted (history retained).
+    const status = packetStatus({ active: getActiveCareerPacket(), cvMd: loadProjectFiles().cvMd });
+    if (status === 'cv_edited_since_seed') {
+      console.log(`  ${warn()} cv.md was edited after the last reseed.`);
+      console.log(`  ${c.dim('→ auto-reseeding now (previous active row demoted, version bumped, history kept)…')}`);
+      const r = await seedCareerPacketFromFiles({ mode: 'reseed' });
+      console.log(`  ${tick()} reseeded → v${r.version} (${r.sections_with_cv_content}/6 sections populated from cv.md)`);
+    } else if (status === 'cv_is_example') {
+      console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx job_ops-mcp reseed')}.`);
+    } else if (status === 'packet_is_template') {
+      console.log(`  ${warn()} active packet still has TODO markers. Run ${c.bold('npx job_ops-mcp reseed')} to rebuild from cv.md.`);
+    }
   } catch (e: any) {
     console.log(`  ${cross()} migration error: ${e?.message ?? e}`);
     process.exit(1);
@@ -191,6 +208,42 @@ async function cmdDoctor() {
   // 5. Visa scoring flag
   const visaOn = (process.env.MCP_JSA_VISA_SCORING ?? 'true').toLowerCase() !== 'false';
   console.log(`  ${tick()} visa scoring: ${visaOn ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`);
+
+  // 6. Career-packet staleness check (only meaningful if the DB exists).
+  try {
+    const { getDb } = await import('./db.js');
+    getDb();
+    const { getActiveCareerPacket, loadProjectFiles, packetStatus } =
+      await import('./core/profile.js');
+    const active = getActiveCareerPacket();
+    const status = packetStatus({ active, cvMd: loadProjectFiles().cvMd });
+    const fixReseed = c.bold('npx job_ops-mcp reseed');
+    const fixInit   = c.bold('npx job_ops-mcp init');
+    switch (status) {
+      case 'no_packet':
+        console.log(`  ${cross()} no active career_packet. Fix: ${fixInit}`);
+        failures++;
+        break;
+      case 'no_cv':
+        console.log(`  ${warn()} cv.md missing — packet is identity-only. Fix: create cv.md, then ${fixReseed}.`);
+        break;
+      case 'cv_is_example':
+        console.log(`  ${warn()} cv.md is still the example template. Fill it in, then ${fixReseed}.`);
+        break;
+      case 'cv_edited_since_seed':
+        console.log(`  ${cross()} cv.md was edited after the last reseed. Run ${fixReseed} to refresh.`);
+        failures++;
+        break;
+      case 'packet_is_template':
+        console.log(`  ${warn()} career_packet v${active!.version} still has TODO markers. Run ${fixReseed}.`);
+        break;
+      case 'ok':
+        console.log(`  ${tick()} career_packet v${active!.version} matches current cv.md`);
+        break;
+    }
+  } catch {
+    console.log(`  ${warn()} career_packet check skipped — DB not initialized (run ${c.bold('npx job_ops-mcp init')} first).`);
+  }
 
   console.log('');
   if (failures > 0) { console.log(c.red(`${failures} check(s) failed.`)); process.exit(1); }
@@ -311,6 +364,39 @@ function yamlBlock(o: unknown, indent = 0): string {
   return JSON.stringify(o);
 }
 
+// ── reseed ──────────────────────────────────────────────────────────────────
+
+async function cmdReseed(flags: Map<string, string | boolean>) {
+  if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
+  console.log(c.bold('\njob_ops-mcp reseed\n'));
+  console.log(c.dim('Rebuilds the active career_packet from the current cv.md + config/profile.yml.'));
+  console.log(c.dim('Bumps version; the previous active row is demoted (history kept).\n'));
+
+  const { loadProjectFiles, cvHasRealContent, seedCareerPacketFromFiles, packetPreview } = await import('./core/profile.js');
+  const { cvMd, profile } = loadProjectFiles();
+
+  if (!profile && !flags.get('force')) {
+    console.error(`  ${cross()} config/profile.yml not found. Run ${c.bold('npx job_ops-mcp init')} first, or pass --force.`);
+    process.exit(1);
+  }
+  if (!cvHasRealContent(cvMd) && !flags.get('force')) {
+    console.error(`  ${warn()} cv.md is missing or looks like the <TODO> example template.`);
+    console.error(`  ${c.dim('Fill it in first, then re-run.')}`);
+    console.error(`  ${c.dim('Or pass --force to reseed anyway (identity-only — most sections stay as <TODO>).')}`);
+    process.exit(1);
+  }
+
+  const r = await seedCareerPacketFromFiles({ mode: 'reseed' });
+  console.log(`  ${tick()} active career_packet → version ${c.bold(`v${r.version}`)} (${r.bytes} bytes)`);
+  console.log(`  ${tick()} ${r.sections_with_cv_content}/6 sections populated from cv.md (sections 3-8)`);
+  console.log('');
+  console.log(c.dim('Preview (first ~400 chars):'));
+  console.log(c.dim('─'.repeat(64)));
+  console.log(packetPreview(r.preview, 600));
+  console.log(c.dim('─'.repeat(64)));
+  console.log('');
+}
+
 // ── help ────────────────────────────────────────────────────────────────────
 
 function cmdHelp() {
@@ -326,6 +412,8 @@ COMMANDS
   start             Boot the MCP + HTTP server. Auto-installs Chromium on first run.
   start --stdio     Same server, but MCP rides stdin/stdout (for Claude Desktop).
                     HTTP file server still runs on the port so /files/* links work.
+  reseed            Rebuild the active career_packet from the current cv.md +
+                    config/profile.yml. Run this after editing cv.md.
   doctor            Diagnose Node version, Chromium, config files, LLM key.
   connect           Print copy-paste MCP client config (Claude Desktop + LibreChat).
   help              Show this message.
@@ -355,6 +443,7 @@ async function main() {
       case 'start':   await cmdStart(flags);   break;
       case 'doctor':  await cmdDoctor();       break;
       case 'connect': await cmdConnect(flags); break;
+      case 'reseed':  await cmdReseed(flags);  break;
       case '--version': case '-v': case 'version': console.log(PKG.version); break;
       case 'help':    case '--help': case '-h': default: cmdHelp(); break;
     }

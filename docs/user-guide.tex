@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 36 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 37 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 36 tools.
+One process. Three planes. Six MCP resources and 37 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -337,7 +337,7 @@ No external Postgres. No n8n. No cloud anything. The single-process design means
 \item \textbf{(Optional)} an LLM API key \textemdash{} Gemini (free tier covers ordinary use) or DeepSeek. Required only for the \texttt{api}/\texttt{batch} paths; the default \texttt{chat} mode of every tool works without one.
 \end{itemize}
 
-\subsection*{Four commands}
+\subsection*{Five commands}
 
 \begin{lstlisting}[language=bashplus]
 # 1. Scaffold cv.md, config/profile.yml, portals.yml in the current directory
@@ -346,15 +346,29 @@ npx job_ops-mcp init
 
 # 2. Edit the three files. Replace every <TODO> placeholder.
 
-# 3. Confirm everything is wired.
+# 3. Rebuild the career_packet from your now-real cv.md. (Or just re-run
+#    `init` --- it auto-reseeds when it detects cv.md changed.)
+npx job_ops-mcp reseed
+
+# 4. Confirm everything is wired.
 npx job_ops-mcp doctor
 
-# 4. Boot the server. Chromium auto-installs on first run (~150 MB, one-time).
+# 5. Boot the server. Chromium auto-installs on first run (~150 MB, one-time).
 npx job_ops-mcp start
 \end{lstlisting}
 
 \begin{tipbox}
 The CLI is also published as the dual alias \cmd{npx job-ops-mcp} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
+\end{tipbox}
+
+\begin{tipbox}[The edit-cv.md loop]
+Your \tool{career\_packet} is the source of truth the chat uses to score JDs and
+draft materials. It's built from \fpath{cv.md} + \fpath{config/profile.yml}. Whenever
+you edit \fpath{cv.md}, \textbf{re-run reseed} so the chat sees the new bullets.
+\cmd{reseed} writes a NEW active version (previous version demoted, history kept).
+The chat can also call the \tool{reseed\_career\_packet} MCP tool to do the same
+thing without leaving the conversation. \cmd{doctor} warns when \fpath{cv.md}
+changed since the last reseed.
 \end{tipbox}
 
 \subsection*{What \tool{init} creates}
@@ -438,7 +452,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 33--36 tools should appear in the tool picker.
+Restart Claude Desktop. The 33--37 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -650,7 +664,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-36 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+37 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -727,6 +741,7 @@ When \env{MCP\_JSA\_VISA\_SCORING=false}, all three visa tools are hidden from \
 \begin{description}[leftmargin=0pt]
 \item[\tool{get\_career\_packet}] Returns the active packet (id, version, markdown content, source-cv hash).
 \item[\tool{update\_career\_packet}] Replaces the active packet with a new version. Bumps \texttt{version}, demotes the previous \texttt{is\_active}.
+\item[\tool{reseed\_career\_packet}] Rebuilds the packet from the current \fpath{cv.md} + \fpath{config/profile.yml}. Same as the CLI \cmd{reseed} command. Bumps version, demotes the previous active row (history kept). Use after editing \fpath{cv.md}. Refuses to seed identity-only unless you pass \texttt{confirm\_empty\_cv: true}.
 \item[\tool{enrich\_company}] Persists a chat- or api-provided enrichment summary for one (company, kind) pair with a 30-day TTL.
 \item[\tool{deep\_research}] Company brief \textemdash{} aggregates current enrichments + top jobs + warm intros + H1B signal. With \texttt{notes} + \texttt{kind} provided in \texttt{api} mode, summarizes the notes into a single enrichment row.
 \item[\tool{daily\_digest}] Morning summary \textemdash{} new top jobs since last digest, follow-ups due, recent status changes, cost snapshot. Stamps \texttt{digest\_state.last\_digest\_at} unless \texttt{dry\_run}.

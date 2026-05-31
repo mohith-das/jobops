@@ -52,6 +52,7 @@ import {
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
   getCareerPacketTool, updateCareerPacketTool, enrichCompanyTool, costEstimateTool,
 } from './tools/ops.js';
+import { reseedCareerPacketTool } from './tools/reseed.js';
 
 // G8 — apply prefill
 import { applyPrefillTool } from './tools/apply_prefill.js';
@@ -74,7 +75,7 @@ const FULL_TOOLSET: AnyToolDef[] = [
   extractStoriesTool, getStoryBankTool, negotiationBriefTool,
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
-  getCareerPacketTool, updateCareerPacketTool, enrichCompanyTool, costEstimateTool,
+  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, enrichCompanyTool, costEstimateTool,
   applyPrefillTool,
   schedulerStatusTool, schedulerEnableTool, schedulerDisableTool,
 ];

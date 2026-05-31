@@ -46,7 +46,9 @@
   stringstyle=\color{accent2},
   commentstyle=\color{black!50}\itshape,
   showstringspaces=false,
-  breaklines=true,breakatwhitespace=true,
+  % breakatwhitespace=false lets long JSON strings / URLs wrap mid-token; the
+  % postbreak hook prints a discreet hook arrow so the reader sees the wrap point.
+  breaklines=true, breakatwhitespace=false, breakindent=12pt,
   columns=fullflexible,keepspaces=true,
   frame=single,framesep=4pt,
   rulecolor=\color{rulec},
@@ -88,7 +90,8 @@
 \fancyfoot[C]{\small\sffamily\color{black!60}\thepage}
 \renewcommand{\sectionmark}[1]{\markright{\thesection\ \ #1}}
 
-\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,citecolor=accent,bookmarks=true,bookmarksnumbered=true]{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,citecolor=accent,bookmarks=true,bookmarksnumbered=true,breaklinks=true]{hyperref}
 % PDF metadata set post-load so the underscore in "job_ops-mcp" survives.
 \hypersetup{
   pdftitle={job\string_ops-mcp user guide},
@@ -99,6 +102,16 @@
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.55em}
+
+% ── Aggressive line-breaking: prefer extra word stretch over running into the margin.
+\sloppy
+\setlength{\emergencystretch}{3em}
+\setlength{\Urlmuskip}{0mu plus 1mu\relax}
+% Allow line breaks inside \texttt{...} at any boundary that already exists.
+\renewcommand{\ttdefault}{cmtt}
+\hyphenpenalty=4000
+\exhyphenpenalty=100
+\tolerance=2000
 
 % ── Macros ──────────────────────────────────────────────────────────────────
 \newcommand{\pkg}{\texttt{job\_ops-mcp}}

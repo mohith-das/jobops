@@ -60,3 +60,13 @@ reports/
 
 # Claude Code local state (per-user, contains absolute paths)
 .claude/settings.local.json
+
+# LaTeX aux files in docs/ (the .pdf is committed; the build noise is not)
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.synctex.gz
+docs/*.fls
+docs/*.fdb_latexmk
+docs/preview-*.png

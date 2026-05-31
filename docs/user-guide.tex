@@ -1,0 +1,1242 @@
+% job_ops-mcp — End-to-end user guide.
+% Compile with: pdflatex user-guide.tex && pdflatex user-guide.tex
+% Toolchain: pdflatex (TeX Live), no shell-escape, no minted, no fontawesome.
+% Fonts: Charter (serif body) + Helvetica clone (sans headings) — both in any basic TL.
+
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in,bottom=1.15in,top=1.05in]{geometry}
+\usepackage{charter}
+\usepackage[scaled=0.92]{helvet}
+\renewcommand{\familydefault}{\rmdefault}
+\usepackage{textcomp}
+\usepackage{microtype}
+
+\usepackage{xcolor}
+\definecolor{accent}{HTML}{145374}
+\definecolor{accent2}{HTML}{2e8a99}
+\definecolor{warn}{HTML}{b35900}
+\definecolor{ok}{HTML}{2e7d32}
+\definecolor{rulec}{HTML}{cfd6dc}
+
+\usepackage{titlesec}
+\titleformat{\section}{\Large\sffamily\bfseries\color{accent}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\sffamily\bfseries\color{accent}}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\normalsize\sffamily\bfseries\color{accent!85!black}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.5em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.3em}
+
+\usepackage{enumitem}
+\setlist{itemsep=0.2em,parsep=0.1em,topsep=0.3em}
+\setlist[description]{leftmargin=1.5em,labelindent=0pt,style=nextline}
+
+\usepackage{tabularx,booktabs,array}
+\renewcommand{\arraystretch}{1.15}
+\usepackage{colortbl}
+
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable,listings}
+
+\usepackage{listings}
+\lstdefinestyle{plain}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{accent}\bfseries,
+  stringstyle=\color{accent2},
+  commentstyle=\color{black!50}\itshape,
+  showstringspaces=false,
+  breaklines=true,breakatwhitespace=true,
+  columns=fullflexible,keepspaces=true,
+  frame=single,framesep=4pt,
+  rulecolor=\color{rulec},
+  backgroundcolor=\color{black!2},
+  numbers=none, belowskip=0.4em, aboveskip=0.4em,
+  literate={->}{{$\rightarrow$}}1 {<=}{{$\le$}}1 {>=}{{$\ge$}}1,
+}
+\lstdefinelanguage{json}{
+  morestring=[b]",
+  morecomment=[l]{//},
+  morekeywords={true,false,null},
+  sensitive=true,
+}
+\lstdefinelanguage{yaml}{
+  morecomment=[l]{\#},
+  morestring=[b]",
+  morekeywords={true,false,null,yes,no},
+  sensitive=true,
+}
+\lstdefinelanguage{bashplus}{
+  morecomment=[l]{\#},
+  morestring=[b]",
+  morekeywords={cd,ls,rm,cp,mv,mkdir,export,echo,grep,curl,git,npx,npm,node,sudo,brew,apt},
+  sensitive=true,
+}
+\lstset{style=plain}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,shapes.misc,arrows.meta,positioning,fit,backgrounds,calc,decorations.pathreplacing}
+
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rulec}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\small\sffamily\color{accent!85!black} job\_ops-mcp \textemdash{} user guide}
+\fancyhead[R]{\small\sffamily\color{accent!85!black} \rightmark}
+\fancyfoot[C]{\small\sffamily\color{black!60}\thepage}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ \ #1}}
+
+\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,citecolor=accent,bookmarks=true,bookmarksnumbered=true]{hyperref}
+% PDF metadata set post-load so the underscore in "job_ops-mcp" survives.
+\hypersetup{
+  pdftitle={job\string_ops-mcp user guide},
+  pdfauthor={job\string_ops-mcp},
+  pdfsubject={MCP server for the full job-search loop},
+  pdfkeywords={mcp, model-context-protocol, claude, librechat, job search, resume, ats},
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+
+% ── Macros ──────────────────────────────────────────────────────────────────
+\newcommand{\pkg}{\texttt{job\_ops-mcp}}
+\newcommand{\tool}[1]{\texttt{#1}}
+\newcommand{\flag}[1]{\texttt{#1}}
+\newcommand{\fpath}[1]{\texttt{#1}}
+\newcommand{\env}[1]{\texttt{#1}}
+\newcommand{\cmd}[1]{\texttt{#1}}
+
+% ── Callouts (no fontawesome — text-label style) ────────────────────────────
+\newtcolorbox{tipbox}[1][]{
+  enhanced, breakable,
+  colback=accent!4!white, colframe=accent!75!black, coltitle=white,
+  fonttitle=\bfseries\sffamily\small, title={TIP\ifx\\#1\\\else: #1\fi},
+  boxrule=0.6pt, arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  attach boxed title to top left={xshift=10pt,yshift=-0.5\baselineskip},
+  boxed title style={colback=accent!75!black, arc=2pt, boxrule=0pt},
+  before skip=0.6em, after skip=0.8em,
+}
+\newtcolorbox{warnbox}[1][]{
+  enhanced, breakable,
+  colback=warn!4!white, colframe=warn!85!black, coltitle=white,
+  fonttitle=\bfseries\sffamily\small, title={SAFETY\ifx\\#1\\\else: #1\fi},
+  boxrule=0.6pt, arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  attach boxed title to top left={xshift=10pt,yshift=-0.5\baselineskip},
+  boxed title style={colback=warn!85!black, arc=2pt, boxrule=0pt},
+  before skip=0.6em, after skip=0.8em,
+}
+\newtcolorbox{examplebox}[1][]{
+  enhanced, breakable,
+  colback=black!2!white, colframe=black!50!white, coltitle=white,
+  fonttitle=\bfseries\sffamily\small, title={EXAMPLE\ifx\\#1\\\else: #1\fi},
+  boxrule=0.5pt, arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  attach boxed title to top left={xshift=10pt,yshift=-0.5\baselineskip},
+  boxed title style={colback=black!55!white, arc=2pt, boxrule=0pt},
+  before skip=0.6em, after skip=0.8em,
+}
+\newtcolorbox{notebox}[1][]{
+  breakable,
+  colback=accent2!6!white, colframe=accent2!50!black,
+  boxrule=0.4pt, arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  before skip=0.4em, after skip=0.6em,
+}
+
+% ── Chat-transcript style (used in worked examples) ─────────────────────────
+% Two args (background, frame) — fully resolved colours so xcolor doesn't try to
+% chain `accent!4` and parse the `4` as a colour name.
+\newtcolorbox{chatturn}[2]{
+  breakable, sharp corners,
+  colback=#1, colframe=#2, leftrule=3pt,
+  boxrule=0pt, arc=0pt, left=8pt, right=8pt, top=4pt, bottom=4pt,
+  before skip=0.3em, after skip=0.3em,
+}
+\newenvironment{userturn}{\begin{chatturn}{accent!5!white}{accent!50!black}\textbf{\sffamily\color{accent}You:}\par\medskip}{\end{chatturn}}
+\newenvironment{aiturn}{\begin{chatturn}{black!4!white}{black!40!white}\textbf{\sffamily\color{black!70}Chat:}\par\medskip}{\end{chatturn}}
+\newenvironment{servturn}{\begin{chatturn}{accent2!5!white}{accent2!50!black}\textbf{\sffamily\color{accent2!60!black}Server:}\par\medskip}{\end{chatturn}}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+\begin{tikzpicture}
+  \node[font=\Huge\sffamily\bfseries\color{accent}] (t) at (0,0) {job\_ops-mcp};
+  \draw[accent, line width=1.2pt] ($(t.south west)+(0,-0.15)$) -- ($(t.south east)+(0,-0.15)$);
+\end{tikzpicture}
+\vspace{0.8em}
+
+{\Large\sffamily End-to-End User Guide\par}
+\vspace{2.2em}
+
+\begin{minipage}{0.82\textwidth}
+\centering\itshape\large
+A self-hosted MCP server for the full job-search loop \textemdash{} portal scanning, JD evaluation, tailored resume + cover PDFs, outreach drafting, story bank, negotiation brief.
+
+\medskip
+\normalsize\upshape\sffamily
+The chat reasons. The server executes. Every artifact comes back as a localhost link.
+\end{minipage}
+
+\vfill
+
+\begin{tikzpicture}
+  \draw[accent!40, line width=0.4pt] (0,0) -- (10,0);
+\end{tikzpicture}
+\vspace{0.6em}
+
+\begin{tabular}{rl}
+\textsf{\small\bfseries Version} & \texttt{0.3.0} \\
+\textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
+\textsf{\small\bfseries License} & MIT \\
+\end{tabular}
+
+\vspace{1em}
+{\footnotesize\sffamily\color{black!55}
+Generic content. Examples use a fictional candidate.\\
+Not affiliated with or endorsed by santifer/career-ops.}
+\end{titlepage}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\tableofcontents
+\thispagestyle{fancy}
+\clearpage
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{What this is, and the mental model}
+
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 36 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+
+The split is the whole point.
+
+\begin{description}
+\item[The chat thinks.] Reads your rubric and your career packet. Scores a JD. Drafts the 6-block evaluation report. Picks bullets per role type. Writes the warm-intro DM. Decides what to ship.
+\item[The server executes.] Persists jobs to a single SQLite file with a known schema. Polls Greenhouse / Ashby / Lever / Workday APIs. Renders Chromium HTML\textrightarrow{}PDF. Validates outreach drafts against safety rails before saving. Serves every artifact at a stable local URL.
+\item[You decide and send.] Nothing auto-submits an application or auto-sends a DM. \pkg{} is preview-only at every irreversible boundary.
+\end{description}
+
+\subsection*{Where it comes from}
+
+\pkg{} merges two systems into one process. The 6-block evaluation report, the ATS-friendly HTML CV template, the unicode-normalization pipeline, and the negotiation playbook framing are ported from \href{https://github.com/santifer/career-ops}{santifer/career-ops} (MIT licensed). The three-dimension rubric (resume / taste / visa), the schema shape, the strict-JSON rater contract, the warm-intro and founder DM tone rules, and the H1B signal logic are distilled from a personal Postgres + n8n pipeline (``JSA'').
+
+\begin{notebox}
+\textbf{Not affiliated with or endorsed by santifer's career-ops.} This is an independent project that adapts the publicly-released MIT-licensed templates and rubric shape into the MCP transport surface. Credit where due, but no endorsement implied.
+\end{notebox}
+
+\subsection*{One sentence}
+
+\textit{Source jobs cheaply, evaluate them carefully, produce tailored materials, draft (don't send) the outreach, track everything in one local database, do it every day.}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Architecture}
+
+One process. Three planes. Six MCP resources and 36 tools.
+
+\begin{center}
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  every node/.style={align=center},
+  client/.style={draw=accent, fill=accent!7, very thick, rounded corners=3pt, minimum width=3.6cm, minimum height=1.1cm, inner sep=4pt},
+  proc/.style  ={draw=accent2, fill=accent2!7, thick, rounded corners=2pt, minimum width=3.0cm, minimum height=0.9cm, inner sep=3pt},
+  store/.style ={draw=black!70, fill=black!4, thick, cylinder, shape border rotate=90, aspect=0.25, minimum width=2.6cm, minimum height=1.2cm, inner sep=3pt},
+  artifact/.style={draw=accent!70!black, fill=white, dashed, rounded corners=2pt, minimum width=2.6cm, minimum height=0.7cm, font=\ttfamily\footnotesize, inner sep=3pt},
+  plane/.style ={draw=black!25, dashed, fill=black!2, rounded corners=4pt, inner sep=10pt},
+  arrow/.style ={-{Stealth[length=2.5mm]}, thick, accent!80!black},
+  thinarrow/.style={-{Stealth[length=2mm]}, thin, black!60},
+]
+
+% chat clients
+\node[client] (claude)    at (0, 6.8) {Claude Desktop\\\scriptsize (MCP stdio or HTTP)};
+\node[client] (librechat) at (5.5, 6.8) {LibreChat\\\scriptsize (streamable-HTTP)};
+\node[client, dashed] (other) at (11, 6.8) {Other MCP client\\\scriptsize (Cursor / generic)};
+
+% MCP server box (groups three planes)
+\node[proc, fill=accent!12, minimum width=12cm, minimum height=0.8cm] (mcp) at (5.5, 5.0) {\bfseries MCP server \textemdash{} streamable-HTTP at \texttt{:7891/mcp}};
+
+% Three planes inside the server
+\node[proc] (source)  at (1.7, 3.3) {\bfseries Source\\\scriptsize scan\_portals\\\scriptsize providers (8)};
+\node[proc] (evaluate) at (5.5, 3.3) {\bfseries Evaluate\\\scriptsize evaluate\_job, batch\_evaluate\\\scriptsize get\_top\_jobs};
+\node[proc] (produce)  at (9.3, 3.3) {\bfseries Produce\\\scriptsize generate\_materials\\\scriptsize render\_pdf, draft\_outreach};
+
+% Storage layer
+\node[store] (sqlite) at (2.2, 1.0) {SQLite\\\scriptsize\texttt{data/mcp-jsa.db}\\\scriptsize WAL mode};
+\node[proc, fill=accent!8, minimum width=3.0cm] (express) at (5.5, 1.0) {Express HTTP\\\scriptsize\texttt{/files/*}\\\scriptsize tracker dashboard};
+\node[proc, fill=accent!8, minimum width=3.0cm] (modes)   at (9.0, 1.0) {modes/ + templates/\\\scriptsize MCP resources\\\scriptsize HTML + LaTeX};
+
+% Artifacts back
+\node[artifact] (resume) at (2.2, -0.6) {/files/pdfs/resume\dots};
+\node[artifact] (cover)  at (5.5, -0.6) {/files/pdfs/cover\dots};
+\node[artifact] (report) at (9.0, -0.6) {/files/reports/\dots.html};
+
+% Arrows: clients to MCP
+\draw[arrow] (claude.south) -- (mcp.north -| claude.south);
+\draw[arrow] (librechat.south) -- (mcp.north -| librechat.south);
+\draw[arrow] (other.south) -- (mcp.north -| other.south);
+
+% MCP to planes
+\draw[thinarrow] (mcp.south -| source.north)   -- (source.north);
+\draw[thinarrow] (mcp.south -| evaluate.north) -- (evaluate.north);
+\draw[thinarrow] (mcp.south -| produce.north)  -- (produce.north);
+
+% Planes to storage
+\draw[thinarrow] (source.south)   -- (sqlite.north);
+\draw[thinarrow] (evaluate.south) -- (sqlite.north);
+\draw[thinarrow] (produce.south)  -- (express.north);
+\draw[thinarrow] (evaluate.south) -- (express.north);
+\draw[thinarrow] (produce.south)  -- (modes.north);
+\draw[thinarrow] (evaluate.south) -- (modes.north);
+
+% Express to artifacts (localhost links)
+\draw[arrow, dashed, accent!60!black] (express.south) -- (resume.north);
+\draw[arrow, dashed, accent!60!black] (express.south) -- (cover.north);
+\draw[arrow, dashed, accent!60!black] (express.south) -- (report.north);
+
+% Artifacts back to clients (the "links come back")
+\draw[arrow, accent2, bend left=40] (resume.east) to[out=0,in=-90] node[right,font=\scriptsize,accent2!60!black] {localhost URL in chat} (claude.south east);
+
+\end{tikzpicture}
+\end{center}
+
+\textbf{Read it like this:} the chat client posts a JSON-RPC \texttt{tools/call} to \texttt{/mcp}. The server routes to one of the three planes \textemdash{} \textbf{Source} (pull jobs from ATS APIs), \textbf{Evaluate} (score, write the 6-block report, persist to SQLite), or \textbf{Produce} (tailor bullets, render PDFs, draft outreach). The Express HTTP server on the same port serves every generated file at \texttt{/files/...} and a read-only tracker dashboard at \texttt{/}. The chat pastes those links back into the conversation \textemdash{} the human clicks to inspect.
+
+\subsection*{Why one process}
+
+No external Postgres. No n8n. No cloud anything. The single-process design means:
+
+\begin{itemize}
+\item \textbf{Boot in 2 seconds.} \cmd{npx job\_ops-mcp start} \textemdash{} no docker compose, no migrations to run by hand, no init container.
+\item \textbf{Local data, local artifacts.} Your jobs, your scores, your LinkedIn export, your H1B import, your tailored PDFs all live next to your \fpath{cv.md} in one directory. Back it up by copying that directory.
+\item \textbf{Chat-driven, not autonomous.} The server reacts to chat tool calls. It is not a background daemon scraping the web.
+\item \textbf{Opt-in cron.} If you do want background scans, \tool{scheduler\_enable} turns on a per-job interval. Off by default.
+\end{itemize}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Installation and setup}
+
+\subsection*{Prerequisites}
+
+\begin{itemize}
+\item \textbf{Node.js \(\ge\) 20.} Check with \cmd{node --version}. Install from \url{https://nodejs.org/} if missing.
+\item \textbf{An MCP-aware chat client.} Claude Desktop, LibreChat, Cursor, or any other client that supports streamable-HTTP MCP.
+\item \textbf{(Optional)} an LLM API key \textemdash{} Gemini (free tier covers ordinary use) or DeepSeek. Required only for the \texttt{api}/\texttt{batch} paths; the default \texttt{chat} mode of every tool works without one.
+\end{itemize}
+
+\subsection*{Four commands}
+
+\begin{lstlisting}[language=bashplus]
+# 1. Scaffold cv.md, config/profile.yml, portals.yml in the current directory
+#    and create the SQLite database. Idempotent --- safe to re-run.
+npx job_ops-mcp init
+
+# 2. Edit the three files. Replace every <TODO> placeholder.
+
+# 3. Confirm everything is wired.
+npx job_ops-mcp doctor
+
+# 4. Boot the server. Chromium auto-installs on first run (~150 MB, one-time).
+npx job_ops-mcp start
+\end{lstlisting}
+
+\begin{tipbox}
+The CLI is also published as the dual alias \cmd{npx job-ops-mcp} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
+\end{tipbox}
+
+\subsection*{What \tool{init} creates}
+
+After \cmd{npx job\_ops-mcp init} from a clean directory you'll have:
+
+\begin{lstlisting}
+my-job-search/
+|-- cv.md                  <- copy of cv.example.md
+|-- config/
+|   `-- profile.yml        <- copy of config/profile.example.yml
+|-- portals.yml            <- copy of portals.example.yml
+`-- data/
+    `-- mcp-jsa.db         <- SQLite with both migrations applied
+\end{lstlisting}
+
+The three editable files are the ``user layer.'' The server reads them at runtime; you own their content.
+
+\subsubsection*{\fpath{cv.md}}
+
+Plain Markdown. Standard headings (\texttt{\#\#\ Work Experience}, \texttt{\#\#\ Projects}, \texttt{\#\#\ Education}, \texttt{\#\#\ Skills}). The renderer parses your bullets into structured experience entries. Keep bullets concrete (action verbs, real metrics).
+
+\subsubsection*{\fpath{config/profile.yml}}
+
+Your identity, target roles + archetypes, narrative likes / dislikes, comp range, location, and visa status. The rubric reads this on every score, the materials generator reads it to populate the cover-letter header, and the warm-intro drafter pulls credibility markers from \texttt{narrative.superpowers}.
+
+\subsubsection*{\fpath{portals.yml}}
+
+The companies whose ATS endpoints \tool{scan\_portals} should poll, plus title and location filters. Greenhouse / Ashby / Lever are auto-detected from any \texttt{careers\_url}; Workday needs an explicit \texttt{workday\_url}; Amazon / Google / generic Playwright are opt-in via \texttt{provider:}.
+
+\subsection*{Environment variables}
+
+All optional. Defaults in parens.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{l X}
+\toprule
+\rowcolor{accent!10}\textbf{Variable} & \textbf{Purpose} \\
+\midrule
+\env{MCP\_JSA\_PORT}              & HTTP port. \textit{(7891)} \\
+\env{MCP\_JSA\_HOST}              & Bind host. \textit{(127.0.0.1)} \\
+\env{MCP\_JSA\_PROJECT\_ROOT}     & Where \fpath{cv.md} / \fpath{profile.yml} / \fpath{portals.yml} live. \textit{(current directory)} \\
+\env{MCP\_JSA\_DATA\_DIR}         & SQLite location. \textit{(\texttt{<project\_root>/data})} \\
+\env{MCP\_JSA\_OUTPUT\_DIR}       & Where generated PDFs and report HTML land. \textit{(\texttt{<project\_root>/output})} \\
+\env{MCP\_JSA\_VISA\_SCORING}     & Set to \texttt{false} to drop the visa surface entirely (see \S\ref{sec:custom}). \textit{(true)} \\
+\env{MCP\_JSA\_LLM\_PROVIDER}     & \texttt{gemini} \textbar{} \texttt{deepseek} \textbar{} \texttt{none}. \textit{(gemini)} \\
+\env{MCP\_JSA\_LLM\_MODEL}        & Provider-specific model id. \textit{(empty \textrightarrow{} provider default)} \\
+\env{GEMINI\_API\_KEY}            & Gemini key. Needed only for \texttt{api}/batch paths. \\
+\env{DEEPSEEK\_API\_KEY}          & DeepSeek key. Same. \\
+\env{MCP\_JSA\_SCHEDULER\_ENABLED} & Whether opt-in cron runs at all. \textit{(false)} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{Connecting your chat client}
+
+\cmd{npx job\_ops-mcp connect} prints copy-paste-ready config for the common clients. Below are the two you most likely care about.
+
+\subsubsection*{Claude Desktop}
+
+Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop\_config.json} on macOS (or \fpath{\%APPDATA\%/Claude/claude\_desktop\_config.json} on Windows):
+
+\begin{lstlisting}[language=json]
+{
+  "mcpServers": {
+    "job_ops-mcp": {
+      "command": "npx",
+      "args": ["-y", "job_ops-mcp", "start"],
+      "env": {
+        "MCP_JSA_PORT": "7891",
+        "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+Restart Claude Desktop. The 33--36 tools should appear in the tool picker.
+
+\subsubsection*{LibreChat (host process)}
+
+In \fpath{librechat.yaml}, under top-level \texttt{mcpServers:}:
+
+\begin{lstlisting}[language=yaml]
+mcpServers:
+  job_ops-mcp:
+    type: streamable-http
+    url: http://127.0.0.1:7891/mcp
+    timeout: 60000
+\end{lstlisting}
+
+Boot the server separately (\cmd{npx job\_ops-mcp start}), then restart LibreChat.
+
+\subsubsection*{LibreChat (Docker)}
+
+Inside a container, \texttt{127.0.0.1} points at the container itself \textemdash{} not your host. Two changes are required:
+
+\begin{lstlisting}[language=yaml]
+mcpServers:
+  job_ops-mcp:
+    type: streamable-http
+    url: http://host.docker.internal:7891/mcp
+    timeout: 60000
+
+mcpSettings:
+  allowedAddresses:
+    - host.docker.internal:7891
+\end{lstlisting}
+
+\begin{warnbox}[Docker SSRF allowlist]
+LibreChat blocks private / internal addresses by default as SSRF protection. Without the \texttt{mcpSettings.allowedAddresses} entry, your MCP server will appear ``connected'' but every tool call will silently fail.
+
+On Linux, \texttt{host.docker.internal} doesn't resolve out of the box. Either add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to the LibreChat service in your \fpath{docker-compose.yml}, or swap the URL for your host's LAN IP and allowlist that IP:port instead.
+\end{warnbox}
+
+\subsection*{Optional: enable the LLM API path}
+
+The default behavior of every reasoning tool is \texttt{mode: chat} \textemdash{} the server returns the rubric + context, your chat client does the thinking, you call the tool again to persist. No LLM key needed.
+
+If you want server-side scoring (the \tool{batch\_evaluate} tool, or \texttt{mode: api} on tools that accept it), set one of:
+
+\begin{lstlisting}[language=bashplus]
+export MCP_JSA_LLM_PROVIDER=gemini
+export GEMINI_API_KEY=...      # free tier covers ordinary single-user usage
+
+# or
+export MCP_JSA_LLM_PROVIDER=deepseek
+export DEEPSEEK_API_KEY=...
+\end{lstlisting}
+
+\tool{cost\_estimate} reports your cumulative spend per provider per tool.
+
+\subsection*{Optional: data imports for the outreach + visa features}
+
+These are \textit{fully optional}. The system works without them.
+
+\begin{itemize}
+\item \textbf{LinkedIn network} \textemdash{} download your data export at LinkedIn $\rightarrow$ Settings $\rightarrow$ Data Privacy $\rightarrow$ Get a copy of your data $\rightarrow$ Connections. Call \tool{import\_linkedin} with the path to \fpath{Connections.csv}. Unlocks \tool{find\_warm\_intros} and \tool{find\_founders}.
+\item \textbf{H1B visa signal} \textemdash{} download a DOL OFLC quarterly LCA disclosure CSV from \href{https://www.dol.gov/agencies/eta/foreign-labor/performance}{dol.gov}. Call \tool{import\_h1b}. Unlocks \tool{visa\_signal} (returns a friendliness band per company).
+\end{itemize}
+
+\begin{warnbox}[Personal data]
+Your SQLite DB now contains LinkedIn connections and H1B filings indexed against companies you've rated. The \fpath{data/} directory is gitignored by default. Don't commit it. Don't share it.
+\end{warnbox}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{The data model}\label{sec:data}
+
+One SQLite file, 18 tables, 8 views. Two diagrams: the relational shape, and the job lifecycle.
+
+\subsection{Relational shape}
+
+\begin{center}
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  every node/.style={align=left},
+  tbl/.style={draw=accent, fill=accent!4, thick, rounded corners=2pt, inner sep=4pt, minimum width=2.4cm, minimum height=0.85cm},
+  ctbl/.style={draw=accent!70!black, fill=accent!10, very thick, rounded corners=2pt, inner sep=4pt, minimum width=2.4cm, minimum height=1.0cm},
+  view/.style={draw=accent2, fill=accent2!5, thick, dashed, rounded corners=2pt, inner sep=3pt, minimum width=2.2cm, minimum height=0.7cm, font=\scriptsize\itshape},
+  fk/.style={-{Stealth[length=2mm]}, thin, accent!70!black},
+]
+% Core
+\node[ctbl]  (jobs)       at (5.0, 4.0) {\textbf{jobs}\\status, scores,\\source\_url, dates};
+\node[ctbl]  (companies)  at (0.5, 4.0) {\textbf{companies}\\name\_normalized};
+\node[tbl]   (apps)       at (9.5, 4.0) {\textbf{applications}\\tailored\_bullets,\\cover\_letter\_draft};
+
+% Around jobs
+\node[tbl]   (eval)       at (5.0, 6.3) {\textbf{eval\_reports}\\6-block A--F};
+\node[tbl]   (stories)    at (9.5, 6.3) {\textbf{story\_bank}\\STAR + Reflection};
+\node[tbl]   (neg)        at (12.4, 6.3) {\textbf{negotiation\_notes}};
+
+% Around companies
+\node[tbl]   (target)     at (0.5, 6.3) {\textbf{target\_companies}\\greenhouse\_slug,\\ashby\_slug, ...};
+\node[tbl]   (aliases)    at (0.5, 1.7) {\textbf{company\_aliases}};
+\node[tbl]   (enrich)     at (0.5, -0.1) {\textbf{enrichment}\\comp / culture /\\recent\_news};
+\node[tbl]   (h1b)        at (3.0, 1.7) {\textbf{h1b\_filings}\\DOL OFLC};
+\node[tbl]   (contacts)   at (3.0, -0.1) {\textbf{contacts}};
+
+% Outreach
+\node[ctbl]  (linkedin)   at (8.5, 1.7) {\textbf{linkedin\_connections}\\is\_recruiter,\\is\_engineering,\\is\_leadership};
+\node[ctbl]  (outreach)   at (12.4, 1.7) {\textbf{outreach}\\status: queued\textrightarrow{}sent\\\textrightarrow{}replied};
+
+% Career packet + ops
+\node[tbl]   (packet)     at (12.4, 4.0) {\textbf{career\_packet}\\versioned,\\is\_active};
+\node[tbl]   (llm)        at (12.4, -0.1) {\textbf{llm\_calls}\\telemetry};
+
+% Views (selection)
+\node[view]  (vtop)       at (6.5, 8.4) {v\_top\_jobs};
+\node[view]  (vwarm)      at (9.5, 8.4) {v\_jobs\_with\_warm\_intros};
+\node[view]  (vfounder)   at (12.4, 8.4) {v\_founder\_network};
+\node[view]  (vfup)       at (12.4, -1.4) {v\_followups\_due};
+\node[view]  (vh1b)       at (0.5, -1.4) {v\_company\_h1b\_signal};
+
+% Foreign keys (selection — keep it readable)
+\draw[fk] (jobs.west) -- (companies.east) node[midway,above,font=\scriptsize\color{accent!70!black}]{company\_id};
+\draw[fk] (apps.west) -- (jobs.east) node[midway,above,font=\scriptsize\color{accent!70!black}]{job\_id};
+\draw[fk] (eval.south) -- (jobs.north);
+\draw[fk] (stories.south west) -- (jobs.north east);
+\draw[fk] (neg.south) -- (jobs.north east);
+\draw[fk] (target.south) -- (companies.north);
+\draw[fk] (aliases.north) -- (companies.south);
+\draw[fk] (enrich.east) to[bend right=10] (companies.south west);
+\draw[fk] (h1b.north) -- (companies.south east);
+\draw[fk] (contacts.east) to[bend right=10] (companies.south);
+\draw[fk] (linkedin.north west) -- (jobs.south east);
+\draw[fk] (linkedin.south) to[out=-90,in=0] (companies.east);
+\draw[fk] (outreach.west) -- (linkedin.east);
+\draw[fk] (outreach.north) to[bend right=15] (jobs.east);
+\draw[fk] (llm.north) -- (apps.south);
+
+% View dependencies
+\draw[fk, dashed, accent2!70!black] (vtop.south) -- (jobs.north);
+\draw[fk, dashed, accent2!70!black] (vwarm.south) -- (jobs.north east);
+\draw[fk, dashed, accent2!70!black] (vfounder.south) -- (linkedin.north);
+\draw[fk, dashed, accent2!70!black] (vfup.north) -- (outreach.south);
+\draw[fk, dashed, accent2!70!black] (vh1b.north) -- (h1b.south);
+
+\end{tikzpicture}
+\end{center}
+
+\textbf{Bold-bordered tables} are the ones you'll touch most often via tools. \textit{Italic dashed boxes} are views \textemdash{} they're virtual; the tool layer reads from them. Lines are foreign keys; arrows point at the referenced side.
+
+A few non-obvious shapes:
+
+\begin{itemize}
+\item \textbf{Cross-source dedup.} \texttt{jobs.content\_hash} (sha-256 of \texttt{company + title + location}) is \texttt{UNIQUE}. The same role posted on Greenhouse and a company's own careers page collapses to one row.
+\item \textbf{Versioned career\_packet.} \tool{update\_career\_packet} bumps a new row with \texttt{is\_active = 1} and demotes the previous active row. The history is retained \textemdash{} you can audit which packet generated which materials via \texttt{applications.materials\_v}.
+\item \textbf{H1B fuzzy join.} \texttt{h1b\_filings.employer\_name\_raw} may not match a company's canonical name. \texttt{company\_aliases} captures legal-name variants; \tool{visa\_signal} resolves via the alias table when the direct join misses.
+\item \textbf{Strict-JSON parse log.} Every LLM call lands in \texttt{llm\_calls} with \texttt{parse\_ok = 0} and the raw text on failure. \tool{cost\_estimate} surfaces parse-error counts so you can tune prompts when a provider drifts.
+\end{itemize}
+
+\subsection{The job lifecycle (state machine)}
+
+Every job lives in exactly one of these states. The transition rules are enforced by the \tool{update\_status} tool and a SQL CHECK constraint; the dashboard at \texttt{/} shows the current count per state.
+
+\begin{center}
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  state/.style={draw=accent, fill=accent!4, thick, rounded corners=3pt, minimum width=2.6cm, minimum height=0.95cm, inner sep=3pt, align=center},
+  terminal/.style={draw=warn, fill=warn!5, thick, rounded corners=3pt, minimum width=2.0cm, minimum height=0.9cm, inner sep=3pt, align=center},
+  good/.style={draw=ok, fill=ok!5, thick, rounded corners=3pt, minimum width=2.0cm, minimum height=0.9cm, inner sep=3pt, align=center},
+  edge/.style={-{Stealth[length=2.4mm]}, thick, accent!70!black},
+  weak/.style={-{Stealth[length=2.4mm]}, thin, black!50, dashed},
+  tool/.style={font=\scriptsize\ttfamily\color{black!60}}
+]
+
+\node[state]    (sourced)  at (0,    4.5) {\textbf{sourced}\\(from scan)};
+\node[state]    (ready)    at (3.7,  4.5) {ready\_to\_apply};
+\node[state]    (drafted)  at (7.4,  4.5) {materials\_drafted};
+\node[state]    (review)   at (11,   4.5) {ready\_to\_review};
+\node[state]    (applied)  at (3.7,  2.0) {applied};
+\node[state]    (screen)   at (6.5,  2.0) {screen};
+\node[state]    (onsite)   at (9.5,  2.0) {onsite};
+\node[good]     (offer)    at (12.5, 2.0) {\textbf{offer}};
+\node[terminal] (rej)      at (7.4, -0.3) {rejected};
+\node[terminal] (disc)     at (3.7, -0.3) {discarded};
+\node[terminal] (skip)     at (0.5, -0.3) {skip};
+
+% Happy path
+\draw[edge] (sourced) -- node[above,tool]{mark\_ready\_to\_apply}  (ready);
+\draw[edge] (ready)   -- node[above,tool]{generate\_materials}    (drafted);
+\draw[edge] (drafted) -- node[above,tool]{render\_pdf}             (review);
+\draw[edge] (review.south) -- node[right,tool]{update\_status}    (applied.north -| review.south);
+\draw[edge] (applied) -- (screen);
+\draw[edge] (screen)  -- (onsite);
+\draw[edge] (onsite)  -- (offer);
+
+% Rejection paths
+\draw[weak] (applied.south) -- (rej.west |- applied.south) -- (rej.north -| rej);
+\draw[weak] (screen.south)  -- (rej.north);
+\draw[weak] (onsite.south)  -- (rej.east  -| onsite.south) -- (rej.north -| rej);
+
+% Discard / skip
+\draw[weak] (sourced.south) -- (skip.north);
+\draw[weak] (ready.south)   -- (disc.north);
+\draw[weak] (drafted.south west) to[bend right=20] (disc.north east);
+
+% Render error loop-back
+\node[font=\scriptsize\itshape\color{warn}] at (9.2, 5.45) {render\_error \textrightarrow{} re-render};
+\draw[weak, warn!80!black] (drafted.north) to[loop above] (drafted.north);
+
+\end{tikzpicture}
+\end{center}
+
+The happy path is left-to-right across the top. \textbf{Green} is the only success terminal. \textbf{Orange} are the three discard terminals \textemdash{} all reachable from any state via \tool{update\_status}. The dashed arrows are weak transitions: you can drop out anywhere, but you can't normally go backwards (re-running \tool{generate\_materials} nulls the PDF cache and moves you back to \texttt{materials\_drafted} for re-render).
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Tool reference}
+
+36 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+
+\subsection*{Evaluation}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{evaluate\_job}] Two-step JD evaluator.
+  \begin{itemize}
+    \item \textbf{Step 1:} pass \texttt{input} (a URL or pasted JD text). Returns \texttt{job\_id}, the normalized JD, the rubric, the report format, and the active career packet for the chat to score.
+    \item \textbf{Step 2:} pass \texttt{job\_id} + \texttt{report} (6 blocks) + \texttt{scores}. Persists the eval row, updates job scores, returns the report URL.
+    \item \texttt{mode: api} runs both steps server-side via the configured LLM, with strict-JSON parsing.
+  \end{itemize}
+\item[\tool{batch\_evaluate}] \textbf{(api only)} Rates all unrated jobs through the LLM. Returns A--F tier distribution + parse-error count. Strict-JSON \textemdash{} on parse failure, score\_total stays NULL with the raw text logged.
+\item[\tool{get\_top\_jobs}] Triage view. Filter by \texttt{min\_score} (default 75), \texttt{role\_category}, \texttt{status}, \texttt{limit}. Returns per-job: scores, role, seniority, location, source URL, and the eval report link.
+\item[\tool{evaluate\_training}] Score a course / cert input on \texttt{skill\_gap\_fill}, \texttt{market\_signal}, \texttt{time\_to\_value}, with a recommendation.
+\item[\tool{evaluate\_project}] Score a portfolio-project idea on \texttt{resume\_signal}, \texttt{interview\_story\_value}, \texttt{effort\_weeks}, \texttt{shipping\_risk}.
+\end{description}
+
+\subsection*{Materials}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{generate\_materials}] Picks bullets / tagline / projects from \fpath{career\_packet.md} per the JD via the tailoring rules. Writes \texttt{applications.tailored\_bullets} + \texttt{cover\_letter\_draft}, validates against the visa rail before persisting. Two-step chat shape; \texttt{api} mode auto-validates LLM output.
+\item[\tool{render\_pdf}] Chromium HTML\textrightarrow{}PDF. \texttt{kind: resume | cover | both}, optional \texttt{cover\_body}, \texttt{page\_format}. Returns localhost link(s). Scans \texttt{cover\_body} for visa leakage before render \textemdash{} fails loud if a leak slips through.
+\item[\tool{get\_report}] Returns the localhost URL + metadata for the latest \texttt{eval\_report} of a \texttt{job\_id}.
+\end{description}
+
+\subsection*{Sourcing}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{scan\_portals}] Fans out across every enabled entry in \fpath{portals.yml}. 8 providers: \tool{greenhouse}, \tool{ashby}, \tool{lever}, \tool{workday} (JSON APIs); \tool{amazon} (JSON); \tool{google} + \tool{playwright\_generic} (Playwright). Optional \texttt{sources} / \texttt{companies} / title + location filters. Returns counts (found / new / dupes) and the top 25 new rows.
+\end{description}
+
+\subsection*{Tracker}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{get\_tracker}] Full pipeline snapshot as JSON. Optional \texttt{status} filter. Mirrors the dashboard at \texttt{/}.
+\item[\tool{update\_status}] Move a job to a new status. Stamps \texttt{applied\_at} on the \texttt{applied} transition. Optional \texttt{note} appended to \texttt{score\_detail.status\_history}.
+\item[\tool{mark\_ready\_to\_apply}] Bulk-marks job IDs as \texttt{ready\_to\_apply}. Skips terminal-state rows.
+\end{description}
+
+\subsection*{Outreach}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{find\_warm\_intros}] Joins \tool{jobs} \(\times\) non-recruiter LinkedIn connections at the same company. Filter by \texttt{company} substring and \texttt{min\_score}. Sorted by score then contact priority (engineering peers $\rightarrow$ leadership $\rightarrow$ others).
+\item[\tool{find\_founders}] Founders / CEO / CTO / c-suite from your network, derived via \tool{v\_founder\_network}. Filter by \texttt{kind}. Stealth-company rows are flagged but excluded by default.
+\item[\tool{draft\_outreach}] Two-step chat: step 1 returns connection + job context + outreach tone rules; step 2 takes the chat-drafted \texttt{message} and persists it after validation (char cap, no emojis, no exclamation marks, no ``refer me'', no visa mentions). \texttt{api} mode does the LLM call inline.
+\item[\tool{draft\_followup}] 1\textendash{}2 line nudge for sent-but-unanswered DMs. Same safety rails. Capped at 300 chars.
+\item[\tool{draft\_reply}] Contextual draft when someone has replied. Takes the received reply text, returns a tone-matched response for human editing. Cap 800 chars.
+\item[\tool{get\_outreach\_queue}] Filter by status (default: \texttt{queued / drafted / edited}). Joins connection + company + linked job.
+\item[\tool{update\_outreach}] Move an outreach row to a new status. Stamps \texttt{sent\_at} on \texttt{sent}; sets \texttt{followup\_due\_at = now + 5d} unless overridden. Re-validates \texttt{edited\_message} against the safety rails.
+\item[\tool{get\_followups\_due}] Returns outreach in status \texttt{sent} with \texttt{followup\_due\_at <= now}.
+\end{description}
+
+\subsection*{Visa (optional, can be hidden globally)}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{visa\_signal}] H1B friendliness band per company: \texttt{strong | mixed | weak | none}. Computed from filings count + recency. \textbf{Internal only} \textemdash{} never surfaced in any resume, cover letter, or outreach.
+\item[\tool{import\_linkedin}] Bulk-load \fpath{linkedin\_connections} from the standard LinkedIn \fpath{Connections.csv} export. \texttt{dry\_run} flag.
+\item[\tool{import\_h1b}] Bulk-load \fpath{h1b\_filings} from a DOL OFLC quarterly LCA CSV. Maps employer names to companies via the alias table; unmatched names persist with \texttt{employer\_id = NULL}.
+\end{description}
+
+\begin{notebox}
+When \env{MCP\_JSA\_VISA\_SCORING=false}, all three visa tools are hidden from \texttt{tools/list} and the score formula renormalizes to \texttt{0.6 \(\cdot\) resume + 0.4 \(\cdot\) taste}. See \S\ref{sec:custom}.
+\end{notebox}
+
+\subsection*{Interview / offer}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{extract\_stories}] Parses STAR + Reflection rows out of the latest \texttt{eval\_report.block\_interview} for a job and appends to \tool{story\_bank}. Pass an explicit \texttt{stories} array to skip parsing.
+\item[\tool{get\_story\_bank}] Returns accumulated stories, with an optional \texttt{competency} substring filter on the tag array.
+\item[\tool{negotiation\_brief}] Returns the negotiation playbook + the most recent \texttt{comp} enrichment for the company + a draft framework (anchor / pillars / knobs / hard rules).
+\end{description}
+
+\subsection*{Profile + ops}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{get\_career\_packet}] Returns the active packet (id, version, markdown content, source-cv hash).
+\item[\tool{update\_career\_packet}] Replaces the active packet with a new version. Bumps \texttt{version}, demotes the previous \texttt{is\_active}.
+\item[\tool{enrich\_company}] Persists a chat- or api-provided enrichment summary for one (company, kind) pair with a 30-day TTL.
+\item[\tool{deep\_research}] Company brief \textemdash{} aggregates current enrichments + top jobs + warm intros + H1B signal. With \texttt{notes} + \texttt{kind} provided in \texttt{api} mode, summarizes the notes into a single enrichment row.
+\item[\tool{daily\_digest}] Morning summary \textemdash{} new top jobs since last digest, follow-ups due, recent status changes, cost snapshot. Stamps \texttt{digest\_state.last\_digest\_at} unless \texttt{dry\_run}.
+\item[\tool{cost\_estimate}] LLM cost aggregated by provider / model / tool over the last N days (default 30). USD estimate based on a built-in rate table.
+\end{description}
+
+\subsection*{Apply (preview only)}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{apply\_prefill}] Opens the application URL in Chromium, detects common form fields (name, email, phone, LinkedIn, GitHub, cover letter, etc.), drafts values from your profile + tailored materials, takes a full-page screenshot. Returns the preview JSON + the screenshot URL + your resume / cover PDF URLs. \textbf{Never submits.}
+\end{description}
+
+\subsection*{Scheduler (opt-in cron, off by default)}
+
+\begin{description}[leftmargin=0pt]
+\item[\tool{scheduler\_status}] Lists enabled jobs, available jobs + intervals, and the last fire time.
+\item[\tool{scheduler\_enable}] Takes an array of job names from: \tool{scan\_portals\_4h}, \tool{batch\_evaluate\_30m}, \tool{followups\_due\_1h}, \tool{daily\_digest\_morning}. Overrides the previous set.
+\item[\tool{scheduler\_disable}] Clears the enabled-jobs list. Process keeps running.
+\end{description}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Worked end-to-end examples}\label{sec:examples}
+
+These walkthroughs use a fictional candidate \textemdash{} the new graduate ``Casey Riley'' targeting Builder PM / Applied AI Engineer roles. Substitute your own profile mentally; the chat client wiring is identical.
+
+\subsection{Example A: paste a JD, get a tailored PDF, mark applied}\label{ex:a}
+
+\textit{Time required: 8\textendash{}15 minutes.}
+
+\begin{userturn}
+I want to apply to this role. Evaluate it, give me a tailored resume + cover, and put it in my tracker.
+
+\medskip
+\fbox{\parbox{0.92\textwidth}{\footnotesize\ttfamily
+Builder PM / Technical PM \textemdash{} Pinch AI (Remote, US)
+
+We're building developer tools for AI agents and need a hands-on PM who can write PRDs, ship features end-to-end, and partner with engineering on agentic workflows, evals, and LLM observability. 4+ years PM, strong SQL + Python, familiarity with LLM systems. Sponsor visas. Comp \$180\textendash{}260k.
+}}
+\end{userturn}
+
+\begin{aiturn}
+Calling \tool{evaluate\_job} with the pasted JD\dots
+\end{aiturn}
+
+\begin{servturn}
+Returns \texttt{job\_id: 9a1b...}, the normalized JD, and three resources to score against (\texttt{modes/rubric.md}, \texttt{modes/report\_format.md}, the active career packet).
+\end{servturn}
+
+\begin{aiturn}
+Reading the rubric and your packet. Scoring:
+
+\smallskip
+\begin{tabular}{lll}
+\textsf{resume\_fit} & 84 & \footnotesize Strong on PRDs, SQL, Python; agentic experience via the \texttt{Vector Agents} side project. \\
+\textsf{taste\_fit}  & 90 & \footnotesize Lean team, AI tooling, ships fast \textemdash{} matches \texttt{narrative.likes}. \\
+\textsf{visa\_fit}   & 88 & \footnotesize Explicit sponsorship; comp band well above the OPT floor. \\
+\textsf{score\_total} & 87 & \footnotesize $\lceil 0.5 \cdot 84 + 0.3 \cdot 90 + 0.2 \cdot 88 \rceil$ = A-tier. \\
+\end{tabular}
+\smallskip
+
+Drafting the 6 blocks now\dots calling \tool{evaluate\_job} step 2 with \texttt{report} + \texttt{scores}.
+\end{aiturn}
+
+\begin{servturn}
+Persists the eval report, renders the HTML.
+\begin{lstlisting}[language=json]
+{
+  "step": "finalized",
+  "job_id": "9a1b...",
+  "report_id": "c4d2...",
+  "report_url": "http://127.0.0.1:7891/files/reports/c4d2....html",
+  "tracker_url": "http://127.0.0.1:7891/"
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+Report ready: \url{http://127.0.0.1:7891/files/reports/c4d2....html}. Now generating tailored materials. Calling \tool{generate\_materials}\dots
+\end{aiturn}
+
+\begin{servturn}
+Returns the career packet + tailoring rules.
+\end{servturn}
+
+\begin{aiturn}
+Picking tagline option D (``Builder PM with engineering teeth''), foregrounding your e-commerce BI ownership and Vector Agents project, dropping the academic projects. Drafting the cover body (282 words). Calling \tool{generate\_materials} again to persist\dots then \tool{render\_pdf} kind=both\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "files": [
+    {"kind":"resume","url":"http://127.0.0.1:7891/files/pdfs/resume-builder-pm-9a1b.pdf","bytes":271769},
+    {"kind":"cover", "url":"http://127.0.0.1:7891/files/pdfs/cover-builder-pm-9a1b.pdf", "bytes":61464}
+  ]
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+Both PDFs at the links above. Click \href{}{resume} and \href{}{cover} to inspect. When you've submitted via Pinch's portal, say so and I'll update the tracker.
+\end{aiturn}
+
+\begin{userturn}
+Done, submitted. Mark it applied.
+\end{userturn}
+
+\begin{aiturn}
+Calling \tool{update\_status job\_id=9a1b... status=applied}\dots done. Pipeline now shows: \textbf{1 applied}, \textbf{1 onsite}, \textbf{2 ready\_to\_apply}. Open the tracker at \url{http://127.0.0.1:7891/}.
+\end{aiturn}
+
+\medskip
+
+\begin{examplebox}[what just happened]
+Two MCP tool calls (\tool{evaluate\_job} twice, \tool{render\_pdf} once, \tool{update\_status} once), one transcript, four artifacts: the 6-block report, the resume PDF, the cover PDF, an updated tracker row. The chat did the writing; the server did the persistence + rendering. You did the deciding and submitting.
+\end{examplebox}
+
+\subsection{Example B: scan portals, triage, batch evaluate}\label{ex:b}
+
+\textit{Time required: 5 minutes of human attention, ~3 minutes of background LLM work.}
+
+\begin{userturn}
+Scan my portals and rate everything new. Then show me the top PM jobs.
+\end{userturn}
+
+\begin{aiturn}
+Calling \tool{scan\_portals}\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "companies_scanned": 18,
+  "jobs_found": 412,
+  "jobs_new": 47,
+  "jobs_dupes": 5,
+  "sources": ["greenhouse","ashby","lever"],
+  "errors": []
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+47 new jobs after title/location filtering. Now \tool{batch\_evaluate} on the unrated set\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "rated": 45,
+  "parse_errors": 2,
+  "distribution": {"A":4, "B":11, "C":17, "D":10, "F":3, "unrated":2}
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+A/B-tier yield: 15 out of 47 (32\%). Two parse errors will retry on the next batch run. Pulling top PM jobs\dots calling \tool{get\_top\_jobs} \texttt{role\_category=pm min\_score=80}\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "count": 6,
+  "items": [
+    {"title":"Builder PM","company_name":"Vellum","score_total":91,"location":"Remote, US","report_url":"http://.../reports/...html"},
+    {"title":"AI Product Manager","company_name":"Mosaic","score_total":88,"location":"NYC","report_url":"http://.../..."},
+    {"title":"Technical PM, Agents","company_name":"Loop AI","score_total":86,"location":"Remote","report_url":"http://.../..."}
+  ]
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+6 PM jobs $\ge$ 80. Click any report link to read the 6-block evaluation. Want me to mark the top 3 \texttt{ready\_to\_apply} and start generating materials?
+\end{aiturn}
+
+\medskip
+
+\begin{examplebox}[the triage instinct]
+The brief 5-minute version is enough. You don't need to read all 45 reports. Skim the top 3\textendash{}5, kill the false positives with \tool{update\_status status=skip}, and queue the keepers for tomorrow's material-generation pass. The whole point of the rubric is to push the human-attention budget toward the top of the funnel.
+\end{examplebox}
+
+\subsection{Example C: find a warm intro, draft outreach, follow up}\label{ex:c}
+
+\textit{Time required: 4\textendash{}7 minutes per DM. Prereq: \tool{import\_linkedin} run once.}
+
+\begin{userturn}
+I scored 91 on the Vellum Builder PM role. Do I know anyone there?
+\end{userturn}
+
+\begin{aiturn}
+Calling \tool{find\_warm\_intros} \texttt{company=Vellum}\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "count": 2,
+  "items": [
+    {"full_name":"Priya Subramaniam","position":"Staff Engineer, Agents","contact_priority":1,"connection_id":"abc-1","linkedin_url":"https://linkedin.com/in/priya-test"},
+    {"full_name":"Jordan Lee","position":"Head of Product","contact_priority":2,"connection_id":"abc-2","linkedin_url":"https://linkedin.com/in/jordan-test"}
+  ]
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+Two: Priya (Staff Eng) and Jordan (Head of Product). Priya's the engineering-peer angle \textemdash{} the tone rules say lead with a technical question. Calling \tool{draft\_outreach} \texttt{connection\_id=abc-1 job\_id=<vellum> type=warm\_intro\_request}\dots
+\end{aiturn}
+
+\begin{servturn}
+Returns connection + job context + the active career packet + \fpath{modes/outreach\_tone.md}.
+\end{servturn}
+
+\begin{aiturn}
+Drafting at 287 chars (cap is 600). Reviewing against the rails: no emojis, no exclamation marks, no ``refer me'', no visa mention, soft close. Calling \tool{draft\_outreach} again with the \texttt{message} to persist\dots
+\end{aiturn}
+
+\begin{servturn}
+\begin{lstlisting}[language=json]
+{
+  "outreach_id": "o-12",
+  "status": "drafted",
+  "validation": {"ok": true, "message_len": 287, "limit": 600, "type": "warm", "issues": []}
+}
+\end{lstlisting}
+\end{servturn}
+
+\begin{aiturn}
+Drafted. Here's the message \textemdash{} edit before sending:
+
+\medskip
+\begin{tcolorbox}[colback=accent2!4!white, colframe=accent2!50!black, boxrule=0.4pt, arc=2pt, sharp corners=northwest]
+\sffamily\small
+saw your recent post about agent eval harnesses \textemdash{} curious how y'all are thinking about multi-step trace replay. i've been shipping agentic workflows on AutoGen + LlamaIndex at my last role, and the trace problem is the one we kept hitting. would love a 15-min chat if it lines up. no worries if not a fit.
+\end{tcolorbox}
+\medskip
+
+When you send, tell me and I'll update the row + queue a follow-up for 5 days out.
+\end{aiturn}
+
+\begin{userturn}
+Sent.
+\end{userturn}
+
+\begin{aiturn}
+\tool{update\_outreach id=o-12 status=sent} \textemdash{} done. Follow-up due 5 days from today.
+
+\textit{(\textbf{5 days later, no reply.})}
+
+\smallskip
+\tool{get\_followups\_due} shows o-12. Calling \tool{draft\_followup id=o-12}\dots
+\end{aiturn}
+
+\begin{servturn}
+Returns the original message + days-since-sent for context.
+\end{servturn}
+
+\begin{aiturn}
+Drafting 1-line nudge (98 chars):
+
+\medskip
+\begin{tcolorbox}[colback=accent2!4!white, colframe=accent2!50!black, boxrule=0.4pt, arc=2pt, sharp corners=northwest]
+\sffamily\small
+still curious about your take on trace replay \textemdash{} happy to come back if it ever makes sense.
+\end{tcolorbox}
+\end{aiturn}
+
+\medskip
+
+\begin{examplebox}[tone rules at work]
+The draft passed all rails: under 600 chars, no exclamation marks, no emoji, no ``refer me'', no visa or sponsorship reference, leads with a specific technical observation, drops one credibility marker (``shipping agentic workflows on AutoGen + LlamaIndex''), and closes soft. The follow-up nudge keeps the same tone in one line. Both will sound like a peer-to-peer DM, not a job application.
+\end{examplebox}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{The daily operating ritual}\label{sec:ritual}
+
+\begin{tipbox}
+\textbf{This is the most important section of the guide.} The system pays back in repeated use, not one-shot setup. A polished evaluation that never becomes a sent application is worth nothing.
+\end{tipbox}
+
+A realistic split for someone running a serious search \textemdash{} \textbf{10\textendash{}30 minutes a day}, three time-boxed slots.
+
+\subsection*{Morning: triage (10 minutes)}
+
+\begin{enumerate}
+\item Open the chat. ``\textit{Run \tool{daily\_digest}.}''
+\item Read the digest: new top jobs since yesterday, follow-ups due today, status changes in the pipeline.
+\item For each new A-tier job: open the report link, skim the 6 blocks. \textbf{One of three actions:} \tool{mark\_ready\_to\_apply}, \texttt{update\_status status=skip}, or do nothing (decide tomorrow). \emph{Do not let A-tier jobs sit in \texttt{sourced} for more than 48 hours \textemdash{} they go stale.}
+\end{enumerate}
+
+\subsection*{Midday: send (15 minutes)}
+
+\begin{enumerate}
+\item ``\textit{\tool{get\_followups\_due}.}'' For each row: \tool{draft\_followup}, edit, send, \tool{update\_outreach status=sent}.
+\item ``\textit{\tool{find\_warm\_intros} for the top 3 ready\_to\_apply jobs.}'' For each non-trivial match: \tool{draft\_outreach}, edit, send, \tool{update\_outreach status=sent}.
+\item Anyone replied? ``\textit{Show outreach in \texttt{replied} status.}'' For each: \tool{draft\_reply}, edit, send.
+\end{enumerate}
+
+\subsection*{Evening: apply (15 minutes)}
+
+\begin{enumerate}
+\item Pick \textbf{one} job from \texttt{ready\_to\_apply}. \tool{generate\_materials}. Review the tailored bullets in chat.
+\item \tool{render\_pdf kind=both}. Open both URLs, eyeball the PDF.
+\item ``\textit{\tool{apply\_prefill} for this job.}'' Open the screenshot URL, see the draft form values. Open the actual application URL in a new tab, paste + upload, submit manually.
+\item \tool{update\_status status=applied}. Done for the day.
+\end{enumerate}
+
+\subsection*{Weekly: review (20 minutes, e.g. Sunday)}
+
+\begin{enumerate}
+\item ``\textit{Show the tracker.}'' Eyeball the funnel \textemdash{} where are you stuck?
+\item ``\textit{Show the story bank.}'' Did this week's interviews add new stories? Tag them by competency.
+\item ``\textit{\tool{cost\_estimate}.}'' Pennies for the LLM. Sanity-check before the next batch.
+\item Edit \fpath{modes/rubric.md} or \fpath{config/profile.yml} if last week's matches were systematically off. The system gets sharper with iteration.
+\end{enumerate}
+
+\medskip
+
+\begin{notebox}
+\textbf{The bottleneck is human attention, not the tool.} 30 well-targeted applications with warm intros over 4 weeks outperforms 200 cold blasts. Resist the temptation to optimize the system instead of using it. If you find yourself fiddling with the rubric weights instead of clicking \emph{send}, that's the failure mode \textemdash{} close the IDE, open the chat.
+\end{notebox}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Customization}\label{sec:custom}
+
+Every behaviour-shaping piece is a Markdown file or a config entry. No code changes required.
+
+\subsection*{Editing the modes}
+
+The six files in \fpath{modes/} are exposed as MCP resources and live-reloaded on edit (the server watches the directory). After saving, the chat picks up the change on the next \texttt{resources/read} \textemdash{} no restart.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{l X}
+\toprule
+\rowcolor{accent!10}\textbf{File} & \textbf{What it controls} \\
+\midrule
+\fpath{modes/rubric.md}                & Scoring dimensions, weights, role-priority order, archetype-override rule, hard rules \\
+\fpath{modes/report\_format.md}        & 6-block A--F (+G) report shape \\
+\fpath{modes/tailoring\_rules.md}      & Resume/cover tailoring decisions per \texttt{role\_category} \\
+\fpath{modes/outreach\_tone.md}        & Warm-intro / founder DM char caps, forbidden phrases, persona rules \\
+\fpath{modes/negotiation\_playbook.md} & Negotiation framework + scripts (anchor, pillars, knobs) \\
+\fpath{modes/career\_packet.md}        & Your bullet/project bank \textemdash{} the superset of every claim \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{Disabling visa scoring (fully optional)}
+
+Visa signal exists because the system's original author was on OPT/STEM-OPT and needed to filter for visa-friendly employers. If you don't need that \textemdash{} US citizens, non-US users, anyone scoring roles where sponsorship is irrelevant \textemdash{} set:
+
+\begin{lstlisting}[language=bashplus]
+export MCP_JSA_VISA_SCORING=false
+\end{lstlisting}
+
+When disabled, the server:
+
+\begin{itemize}
+\item Drops \texttt{visa\_fit} from the rubric. \texttt{score\_total = round(0.6 \(\cdot\) resume\_fit + 0.4 \(\cdot\) taste\_fit)} \textemdash{} enforced server-side regardless of what the chat returns.
+\item Prepends a ``VISA SCORING DISABLED'' override block to the top of the \texttt{mcp-jsa://modes/rubric} resource.
+\item Hides \tool{visa\_signal}, \tool{import\_h1b}, \tool{import\_linkedin} from \texttt{tools/list}.
+\item Strips \texttt{score\_visa\_fit} from \tool{get\_top\_jobs} items and the eval-report HTML badge.
+\item Records \texttt{visa\_scoring\_enabled: false} in every \texttt{score\_detail} blob so you can audit which formula scored a given row.
+\end{itemize}
+
+Every other feature is unaffected.
+
+\subsection*{Adding target companies}
+
+Append to \fpath{portals.yml} \texttt{tracked\_companies:} \textemdash{} restart the server (or wait for the next \tool{scan\_portals} call which re-reads the file).
+
+\begin{lstlisting}[language=yaml]
+  - name: "Vellum"
+    careers_url: "https://job-boards.greenhouse.io/vellum"
+    priority: 1
+    enabled: true
+
+  - name: "ExampleCo"
+    workday_url: "https://examplco.wd5.myworkdayjobs.com/External"
+    priority: 2
+    enabled: true
+
+  - name: "ClosedBoardCo"
+    provider: "playwright_generic"
+    careers_url: "https://example.com/careers"
+    selectors:
+      item:     "a.job-card"
+      title:    ".job-title"
+      location: ".job-location"
+      wait_for: ".jobs-loaded"
+    enabled: false
+\end{lstlisting}
+
+\subsection*{Non-US markets}
+
+The defaults assume nothing. To localize:
+
+\begin{itemize}
+\item Translate the headings of \fpath{modes/rubric.md} and \fpath{modes/negotiation\_playbook.md}; keep the formula structure.
+\item Update \texttt{narrative.likes / dislikes} and \texttt{compensation.target\_range} in \fpath{config/profile.yml} to match your market.
+\item Add region-specific portals to \fpath{portals.yml}. The generic Playwright provider works against any HTML careers page given the right selectors.
+\item Localize \texttt{title\_filter.positive / negative} \textemdash{} ``Ingeniero'' for Spanish-language postings, ``Ingénieur'' for French, etc.
+\end{itemize}
+
+\subsection*{Tuning the rubric weights}
+
+Edit \fpath{modes/rubric.md}. Change the weights paragraph and the formula. Next \texttt{evaluate\_job} call returns the new rubric; the chat will use the updated math.
+
+\begin{tipbox}
+If you change weights mid-search, your existing \texttt{score\_total} values reflect the old formula. \tool{batch\_evaluate} will re-rate any job whose \texttt{score\_total} is NULL \textemdash{} set the column to NULL for everything you want re-scored.
+\end{tipbox}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{The hard rules (safety model)}
+
+Five rules are enforced at the code level, not just documented. Removing any of them is a one-line change you'd notice in code review.
+
+\begin{warnbox}[Rule 1: Visa data never reaches a candidate-facing artifact]
+\texttt{scanForVisaLeakage()} runs inside \tool{render\_pdf} (on \texttt{cover\_body}) and inside \tool{generate\_materials} (on the entire serialized output) before persistence. If a leak is detected the call \textbf{fails}, not warns. Visa data is internal to \tool{visa\_signal} scoring and \texttt{visa\_fit} \textemdash{} that's the only valid surface.
+\end{warnbox}
+
+\begin{warnbox}[Rule 2: Never invent claims outside the career packet]
+The materials generator instruction set explicitly tells the chat: ``NEVER invent metrics not in the packet.'' The packet is the authoritative source; bullets that cite numbers not present in it should fail human review. \tool{update\_career\_packet} bumps a version so the audit trail is permanent.
+\end{warnbox}
+
+\begin{warnbox}[Rule 3: Human-in-the-loop everywhere]
+No tool auto-submits an application. \tool{apply\_prefill} opens the page, drafts values, takes a screenshot, and stops \textemdash{} the human submits manually. No tool auto-sends a DM. \tool{draft\_outreach} persists a draft; the human sends, then calls \tool{update\_outreach status=sent}. Removing this gate is the single change that would turn this from a tool into a spam cannon.
+\end{warnbox}
+
+\begin{warnbox}[Rule 4: Strict-JSON parsing with visible failure]
+Every \texttt{api}-path LLM call uses \texttt{response\_format: json\_object}. On parse failure the call records \texttt{parse\_ok = 0} + the raw text in \texttt{llm\_calls}, and the score row stays NULL \textemdash{} \emph{never} a default \texttt{(0,0,0,0)}. ``Silent zeros'' was the JSA pipeline's worst failure mode; \tool{cost\_estimate} surfaces parse-error counts so drift is visible.
+\end{warnbox}
+
+\begin{warnbox}[Rule 5: Serialized writes]
+Every tool that mutates the tracker / applications / outreach goes through \texttt{runInWriteLock()} in \fpath{src/db.ts}. Concurrent tool calls won't interleave their writes; the state machine stays consistent.
+\end{warnbox}
+
+\medskip
+
+The outreach safety rails extend Rule 1 with four more pattern groups, validated in \tool{validateOutreach()} before any DM is persisted:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{l X}
+\toprule
+\rowcolor{accent!10}\textbf{Rule} & \textbf{What it rejects} \\
+\midrule
+\texttt{char\_cap}            & Warm: 600 chars. Founder: 300. Follow-up: 300. Reply: 800. \\
+\texttt{no\_visa\_mentions}   & H1B / OPT / EAD / visa / sponsorship / green card / work permit / citizenship. \\
+\texttt{no\_refer\_me}        & ``refer me'' / ``put my resume in front of'' / ``good word'' / ``get me an interview''. \\
+\texttt{no\_emojis}           & Any emoji codepoint. \\
+\texttt{no\_exclamation\_marks} & Any \texttt{!}. \\
+\texttt{no\_cliches}          & ``I hope this finds you well'' / ``I'd love to pick your brain''. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+A failing draft is returned to the chat with the specific rule + offending hit so it can be revised. The drafter never silently strips and saves.
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Troubleshooting and FAQ}
+
+\subsection*{Setup issues}
+
+\begin{description}
+\item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx job\_ops-mcp start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
+
+\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx job\_ops-mcp doctor} to confirm.
+
+\item[\textit{LibreChat shows ``connected'' but every call fails}] You're in Docker, the LibreChat container can't reach your host's \texttt{127.0.0.1}. Swap to \texttt{host.docker.internal} \textbf{and} add the entry to \texttt{mcpSettings.allowedAddresses}. On Linux, add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to docker-compose.yml.
+
+\item[\textit{LLM tools error with ``No LLM provider configured''}] Set \env{MCP\_JSA\_LLM\_PROVIDER} + the matching API key. The default \texttt{chat} mode of every tool works without one \textemdash{} only \tool{batch\_evaluate} and \texttt{mode: api} need a key.
+
+\item[\textit{Migrations didn't run}] The server applies pending migrations on first DB open. If the \fpath{data/} directory is on a read-only filesystem, the boot will error. Set \env{MCP\_JSA\_DATA\_DIR} to a writable path and re-run.
+
+\item[\textit{Doctor says ``cv.md missing''} but it's in the directory] You probably launched from a different CWD than where \cmd{init} ran. Set \env{MCP\_JSA\_PROJECT\_ROOT} to the absolute path, or \cmd{cd} into the right directory before \cmd{start}.
+\end{description}
+
+\subsection*{Conceptual FAQ}
+
+\begin{description}
+\item[Does this work without visa data?] Yes. \env{MCP\_JSA\_VISA\_SCORING=false} drops the visa surface entirely \textemdash{} formula renormalizes, tools hidden, columns stripped. Use the system exactly as documented; only the visa-specific bits go quiet.
+
+\item[Does this work outside the US?] Yes. The defaults assume no specific market. Edit \fpath{modes/*.md} to match your local language / comp norms, add region-specific portals to \fpath{portals.yml}, and adjust \texttt{title\_filter}.
+
+\item[How much does an LLM key cost?] On Gemini 2.5 Flash (free tier), a single \tool{batch\_evaluate} on 50 fresh jobs is comfortably under the per-minute quota and the per-day quota. \tool{cost\_estimate --days 30} reports your actual usage. The chat-mode tools cost zero on the server side (your chat client pays its own inference cost via your subscription).
+
+\item[Why isn't there an \texttt{auto\_apply} tool?] That's the line. Every irreversible boundary \textemdash{} submit, send DM, post comment \textemdash{} is a human action. The system makes the prep cheaper; the human still decides and acts. See \S\ref{sec:honest}.
+
+\item[Can I run two of these on the same machine?] Yes \textemdash{} pick different ports and project roots. Each gets its own SQLite file; the two never interact.
+
+\item[Where does the SQLite file go?] By default, \texttt{<project\_root>/data/mcp-jsa.db}. Override with \env{MCP\_JSA\_DATA\_DIR}.
+
+\item[How big does the DB get?] After 6 months of daily use with 10\textendash{}20k jobs scored, expect ~50\textendash{}100 MB. SQLite handles that comfortably with WAL mode. Back up by copying the directory; nothing else.
+
+\item[Will the schema change?] Yes, additively. Future migrations land in \fpath{src/migrations/00X\_\dots.sql} and apply on first DB open after \texttt{npm update}. The migration ledger lives in the \texttt{\_migrations} table so already-applied ones aren't re-run.
+\end{description}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{This finds jobs. It doesn't send them.}\label{sec:honest}
+
+A frank coda.
+
+\pkg{} is good at four things:
+
+\begin{enumerate}
+\item \textbf{Sourcing.} Polling 20+ ATS endpoints in a single \tool{scan\_portals} call, with cross-source dedup. Better than refreshing tabs by hand.
+\item \textbf{Scoring.} A consistent rubric applied to every JD, persisted with the reasoning. Better than re-deciding ``is this worth my time?'' a hundred times.
+\item \textbf{Drafting.} Tailored bullets, ATS-clean PDFs, on-tone DMs, follow-up nudges. Better than starting from scratch each time.
+\item \textbf{Tracking.} One database, one tracker URL. Better than a spreadsheet that drifts.
+\end{enumerate}
+
+It is \textbf{not} good at \textemdash{} and is intentionally architected against \textemdash{} the thing that actually closes the loop: \textit{deciding which roles to apply to and sending the application or the DM}. That is the human's job, every day. The system can score 50 jobs in an evening; you can probably honestly apply to two or three a day if the materials are tailored and the outreach is real. The bottleneck is the human, by design.
+
+If you find yourself \textbf{tweaking the rubric instead of clicking send}, the system is failing you \textemdash{} not because it's broken, but because it's optimizing the wrong axis. The daily ritual in \S\ref{sec:ritual} is built around that risk. Use it.
+
+\bigskip\bigskip
+
+\begin{center}
+\textit{Good luck out there.}
+\end{center}
+
+\vfill
+\begin{flushright}
+\small\color{black!50}\sffamily
+job\_ops-mcp \textbullet{} v0.3.0 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
+\end{flushright}
+
+\end{document}

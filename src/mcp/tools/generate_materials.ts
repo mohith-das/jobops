@@ -91,10 +91,32 @@ export const generateMaterialsTool = defineTool({
   },
 });
 
+/**
+ * Concatenates the materials fields that end up in the actual delivered resume + cover
+ * letter. Used by the visa-rail scan. Internal-only fields (tailoring_notes, debug
+ * scratch) are deliberately excluded — a chat note saying "I made sure not to mention
+ * visa" should NOT trip the rail. Exported for tests.
+ */
+export function candidateFacingMaterialsText(m: any): string {
+  const parts: string[] = [];
+  if (typeof m?.tagline === 'string') parts.push(m.tagline);
+  if (m?.experience_bullets && typeof m.experience_bullets === 'object') {
+    for (const v of Object.values(m.experience_bullets)) {
+      if (Array.isArray(v)) {
+        for (const b of v) if (typeof b === 'string') parts.push(b);
+      }
+    }
+  }
+  if (typeof m?.projects_section  === 'string') parts.push(m.projects_section);
+  if (typeof m?.skills_section    === 'string') parts.push(m.skills_section);
+  if (typeof m?.cover_letter_body === 'string') parts.push(m.cover_letter_body);
+  return parts.join('\n');
+}
+
 async function persistMaterials(job_id: string, m: any): Promise<any> {
-  // Final visa rail across all generated text.
-  const blob = JSON.stringify(m ?? {});
-  const leaks = scanForVisaLeakage(blob);
+  // Visa rail across only the candidate-facing text. tailoring_notes is internal meta
+  // and may legitimately mention visa as a deliberate-omission note — don't trip on it.
+  const leaks = scanForVisaLeakage(candidateFacingMaterialsText(m));
   if (leaks.length) {
     throw new Error(`materials failed visa rail: ${JSON.stringify(leaks)} — not persisted`);
   }

@@ -12,6 +12,52 @@ const FETCH_TIMEOUT_MS = 12_000;
 const MAX_JD_CHARS     = 18_000;
 const USER_AGENT       = 'Mozilla/5.0 (compatible; mcp-jsa/0.1)';
 
+/**
+ * Best-effort extraction of the company name from a known ATS URL. Returns a
+ * Title-Cased company name when the URL matches a recognised host, else null.
+ * Exported for tests + direct use in adoptJobFromJD.
+ *
+ *   greenhouse:      https://(job-boards|boards|job-boards.eu).greenhouse.io/<slug>
+ *   ashby:           https://jobs.ashbyhq.com/<slug>
+ *   lever:           https://jobs.lever.co/<slug>
+ *   workday:         https://<tenant>.wd<N>.myworkdayjobs.com/<site>
+ *   amazon:          https://*.amazon.jobs/*  → "Amazon"
+ *   google careers:  https://www.google.com/about/careers/* → "Google"
+ */
+export function extractCompanyFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return null; }
+  const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname;
+
+  if (/(?:^|\.)greenhouse\.io$/.test(host)) {
+    const m = path.match(/^\/([^/]+)/);
+    if (m) return titleCaseSlug(m[1]);
+  }
+  if (host === 'jobs.ashbyhq.com') {
+    const m = path.match(/^\/([^/]+)/);
+    if (m) return titleCaseSlug(m[1]);
+  }
+  if (host === 'jobs.lever.co') {
+    const m = path.match(/^\/([^/]+)/);
+    if (m) return titleCaseSlug(m[1]);
+  }
+  const wd = host.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/);
+  if (wd) return titleCaseSlug(wd[1]);
+  if (host === 'www.amazon.jobs' || host === 'amazon.jobs') return 'Amazon';
+  if (host === 'www.google.com' && /^\/about\/careers/.test(path)) return 'Google';
+  return null;
+}
+
+function titleCaseSlug(slug: string): string {
+  return slug
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export interface NormalizedJD {
   source:      'url' | 'paste';
   source_url:  string | null;
@@ -56,11 +102,15 @@ async function fetchFromUrl(url: string): Promise<NormalizedJD> {
     const ogSite  = extractMeta(html, 'og:site_name');
     const ogTitle = extractMeta(html, 'og:title');
     const text    = htmlToPlainText(html);
+    // URL-derived company is authoritative for known ATS hosts. og:site_name on those
+    // hosts is often the ATS vendor ("Greenhouse"), not the hiring company, so prefer
+    // the slug. Fall back to OG site_name for unknown hosts.
+    const company_guess = extractCompanyFromUrl(url) ?? ogSite ?? null;
     return {
       source: 'url',
       source_url: url,
       title_guess: ogTitle ?? title ?? null,
-      company_guess: ogSite ?? null,
+      company_guess,
       text: text.slice(0, MAX_JD_CHARS),
       raw_html: html.slice(0, MAX_JD_CHARS * 2),
       fetched_at: new Date().toISOString(),

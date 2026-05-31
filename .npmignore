@@ -3,6 +3,7 @@
 # loosened.
 
 src/
+tests/
 career-ops/
 data/
 output/

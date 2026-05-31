@@ -50,6 +50,7 @@
     "connect": "node dist/cli.js connect",
     "dev": "tsx watch src/cli.ts start",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test 'tests/**/*.test.mjs'",
     "prepublishOnly": "npm run build",
     "playwright:install": "playwright install chromium"
   },

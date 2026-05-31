@@ -1,0 +1,57 @@
+name: Publish to npm
+
+# Triggered ONLY by pushing a version tag (v*.*.*) — not on every push to main.
+# This keeps releases deliberate; merging to main never auto-publishes.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Prevent two simultaneous tag pushes from racing each other.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # required for `npm publish --provenance` (sigstore attestations)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      # Belt-and-suspenders: refuse to publish if the tag (vX.Y.Z) doesn't match
+      # package.json's "version". Prevents a typo from shipping the wrong version.
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          echo "tag: $TAG_VERSION   package.json: $PKG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        # --access public is required for scoped packages and a no-op for unscoped ones;
+        # safe to leave in either way. --provenance attaches a sigstore attestation
+        # showing the build came from this exact workflow run (visible on npmjs.com).
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -344,6 +344,52 @@ job_ops-mcp/
 
 ---
 
+## Releasing (maintainer notes)
+
+Releases ship to npm via the GitHub Actions workflow at
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml). The workflow fires
+**only on pushing a version tag** (`v*.*.*`) — never on a push to `main` — so merging
+work never auto-publishes.
+
+### One-time setup
+
+1. **Generate an npm automation token** at [npmjs.com](https://www.npmjs.com/) →
+   click your avatar → **Access Tokens** → **Generate New Token** → choose
+   **"Automation"** (NOT *Read-Only* and NOT *Publish*; Automation tokens bypass 2FA,
+   which CI needs).
+2. **Add it to GitHub.** In the repo → **Settings** → **Secrets and variables** →
+   **Actions** → **New repository secret** → name **`NPM_TOKEN`**, value the token
+   you just copied (starts with `npm_`).
+
+### Cutting a release
+
+```bash
+# 1. Bump the version in package.json. Either edit by hand, or:
+npm version patch      # 0.3.0 → 0.3.1 (also creates a git commit + tag)
+# npm version minor    # 0.3.0 → 0.4.0
+# npm version major    # 0.3.0 → 1.0.0
+
+# 2. If you edited package.json by hand instead of `npm version`, commit it:
+# git add package.json && git commit -m "release: vX.Y.Z"
+# git tag vX.Y.Z
+
+# 3. Push the commit + tag.
+git push && git push origin vX.Y.Z
+```
+
+That tag push triggers `publish.yml`, which:
+
+1. Checks out the tagged commit.
+2. Sets up Node 20 with the npm registry.
+3. Verifies the tag (`vX.Y.Z`) matches `package.json`'s `version` — fails fast on a typo.
+4. `npm ci` + `npm run build`.
+5. `npm publish --access public --provenance` — provenance attaches a sigstore
+   attestation visible on npmjs.com showing exactly which GitHub Actions run produced
+   the tarball.
+
+Watch progress in the repo's **Actions** tab. On success the new version appears on
+[npmjs.com/package/job_ops-mcp](https://www.npmjs.com/package/job_ops-mcp).
+
 ## Contributing / feedback
 
 Issues + PRs welcome. There's no contributor guide yet — open an issue first if you're

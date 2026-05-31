@@ -2,6 +2,7 @@
 // links that hit MCP tools via the same server.
 import { getDb } from '../db.js';
 import { escapeHtml } from '../core/html.js';
+import { themeCss, themeInitScript, themeToggleButton } from './theme.js';
 
 export function renderDashboard(): string {
   const db = getDb();
@@ -65,34 +66,39 @@ export function renderDashboard(): string {
 <head>
 <meta charset="utf-8" />
 <title>mcp-jsa tracker</title>
+${themeInitScript()}
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; background: #fafbfc; color: #1a1a2e; }
-  header { padding: 1.4rem 1.6rem; border-bottom: 1px solid #e2e2e2; background: #fff; display: flex; justify-content: space-between; align-items: baseline; }
-  header h1 { margin: 0; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; color: hsl(187, 74%, 32%); }
-  header .meta { color: #777; font-size: 0.85rem; }
+${themeCss()}
+  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; background: var(--bg-page); color: var(--text); }
+  header { padding: 1.4rem 1.6rem; border-bottom: 1px solid var(--border); background: var(--bg-card);
+           display: flex; justify-content: space-between; align-items: baseline; }
+  header h1 { margin: 0; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+  header .meta { color: var(--text-muted); font-size: 0.85rem; }
   main { padding: 1.4rem 1.6rem; max-width: 1180px; margin: 0 auto; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.4rem; }
-  .card { background: #fff; border: 1px solid #e2e2e2; border-radius: 4px; padding: 0.75rem 0.9rem; }
-  .card .n { font-size: 1.4rem; font-weight: 700; }
-  .card .lbl { color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e2e2; }
-  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; vertical-align: top; }
-  th { background: #f6f6f8; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; color: #555; }
-  td.meta { color: #777; font-size: 0.8rem; }
-  .tier { font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 3px; color: #fff; }
-  .tier.a { background: hsl(140, 60%, 38%); }
-  .tier.b { background: hsl(195, 60%, 42%); }
-  .tier.c { background: hsl(36,  80%, 45%); }
-  .tier.d { background: hsl(8,   55%, 50%); }
-  .muted { color: #999; }
-  code { background: #f0f0f3; padding: 0.05rem 0.4rem; border-radius: 2px; font-size: 0.78em; }
-  a { color: hsl(270, 70%, 45%); text-decoration: none; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem 0.9rem; box-shadow: var(--shadow); }
+  .card .n { font-size: 1.4rem; font-weight: 700; color: var(--text); }
+  .card .lbl { color: var(--text-2); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow); }
+  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border-soft);
+           font-size: 0.88rem; vertical-align: top; color: var(--text); }
+  th { background: var(--bg-soft); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; color: var(--text-2); }
+  td.meta { color: var(--text-muted); font-size: 0.8rem; }
+  .tier { font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 3px; color: var(--tier-fg); display: inline-block; min-width: 1.6em; text-align: center; }
+  .tier.a { background: var(--tier-a); }
+  .tier.b { background: var(--tier-b); }
+  .tier.c { background: var(--tier-c); }
+  .tier.d { background: var(--tier-d); }
+  .tier.muted { background: transparent; color: var(--text-muted); font-weight: 400; }
+  .muted { color: var(--text-muted); }
+  code { background: var(--code-bg); padding: 0.05rem 0.4rem; border-radius: 2px; font-size: 0.78em; color: var(--text-2); }
+  a { color: var(--link); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .empty { padding: 3rem; text-align: center; color: #777; }
+  .empty { padding: 3rem; text-align: center; color: var(--text-muted); }
 </style>
 </head>
 <body>
+${themeToggleButton()}
 <header>
   <h1>mcp-jsa tracker</h1>
   <span class="meta">${counts.total ?? 0} jobs in pipeline · /files served from output/</span>
@@ -131,4 +137,3 @@ export function renderDashboard(): string {
 </main>
 </body></html>`;
 }
-

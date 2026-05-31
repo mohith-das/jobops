@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { config } from '../config.js';
 import { getDb, runInWriteLock } from '../db.js';
 import { escapeHtml } from './html.js';
+import { themeCss, themeInitScript, themeToggleButton } from '../http/theme.js';
 
 export interface ReportBlocks {
   archetype_detected?: string | null;
@@ -178,27 +179,39 @@ function renderReportHtml(args: {
 <head>
 <meta charset="utf-8" />
 <title>Evaluation ${args.reportId.slice(0, 8)}</title>
+${themeInitScript()}
 <style>
-  :root { color-scheme: light dark; }
+${themeCss()}
   body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; max-width: 880px;
-         margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #1a1a2e; }
-  h1 { margin-bottom: 0.25rem; }
-  .meta { color: #555; font-size: 0.9rem; margin-bottom: 1.25rem; }
-  .score { background: #1a1a2e; color: #fff; padding: 0.15rem 0.55rem; border-radius: 3px; font-weight: 600; }
-  .score.muted { background: #999; }
-  .sub { color: #555; font-size: 0.85rem; margin-left: 0.5rem; }
+         margin: 2rem auto; padding: 0 1rem 4rem; line-height: 1.55;
+         background: var(--bg-page); color: var(--text); }
+  h1 { margin-bottom: 0.25rem; color: var(--text); }
+  .meta { color: var(--text-2); font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .score { background: var(--accent); color: var(--accent-fg); padding: 0.15rem 0.55rem;
+           border-radius: 3px; font-weight: 600; }
+  .score.muted { background: var(--text-muted); }
+  .sub { color: var(--text-2); font-size: 0.85rem; margin-left: 0.5rem; }
   section { margin-bottom: 1.5rem; }
   h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.05em;
-       color: hsl(187, 74%, 32%); border-bottom: 1.5px solid #e2e2e2; padding-bottom: 4px; }
-  .prose pre { white-space: pre-wrap; background: #f6f6f8; padding: 0.6rem 0.8rem;
-               border-left: 3px solid #ccc; border-radius: 3px; font-size: 0.9em; }
-  .keywords code { background: #f0f0f3; padding: 0.1rem 0.4rem; border-radius: 2px;
-                   margin: 0.1rem 0.15rem 0.1rem 0; display: inline-block; font-size: 0.85em; }
+       color: var(--accent); border-bottom: 1.5px solid var(--border); padding-bottom: 4px; }
+  .prose p, .prose li { color: var(--text); }
+  .prose table { border-collapse: collapse; margin: 0.5em 0; }
+  .prose td { border-bottom: 1px solid var(--border-soft); padding: 0.3em 0.6em; color: var(--text); }
+  .prose code { background: var(--code-bg); color: var(--text-2); padding: 0.05em 0.35em;
+                border-radius: 2px; font-size: 0.88em; }
+  .prose pre { white-space: pre-wrap; background: var(--pre-bg); padding: 0.6rem 0.8rem;
+               border-left: 3px solid var(--pre-border); border-radius: 3px; font-size: 0.9em;
+               color: var(--text); }
+  .prose strong { color: var(--text); }
+  .keywords code { background: var(--accent-soft); color: var(--accent); padding: 0.1rem 0.4rem;
+                   border-radius: 2px; margin: 0.1rem 0.15rem 0.1rem 0; display: inline-block;
+                   font-size: 0.85em; }
   .raw  { max-height: 280px; overflow: auto; }
-  a { color: hsl(270, 70%, 45%); }
+  a { color: var(--link); }
 </style>
 </head>
 <body>
+${themeToggleButton()}
 <h1>Evaluation Report</h1>
 <div class="meta">
   ${scoreBadge} &nbsp;·&nbsp;

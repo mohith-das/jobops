@@ -10,6 +10,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Express, Request, Response } from 'express';
 
 import { config } from '../config.js';
@@ -129,3 +130,17 @@ export function mountMcp(app: Express, path = '/mcp'): void {
 }
 
 export function listAllTools(): AnyToolDef[] { return ALL_TOOLS; }
+
+// ── stdio transport ─────────────────────────────────────────────────────────
+// Used by Claude Desktop and any other MCP client that only speaks stdio.
+// Blocks until stdin closes (the client disconnects). In stdio mode the caller
+// must keep stdout clean — all logging in this process already goes to stderr.
+export async function serveStdio(): Promise<void> {
+  const server = getMcpServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  // Server runs until transport closes; transport.onclose fires when stdin EOFs.
+  await new Promise<void>((resolve) => {
+    transport.onclose = () => resolve();
+  });
+}

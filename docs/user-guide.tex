@@ -414,7 +414,12 @@ All optional. Defaults in parens.
 
 \cmd{npx job\_ops-mcp connect} prints copy-paste-ready config for the common clients. Below are the two you most likely care about.
 
-\subsubsection*{Claude Desktop}
+\subsubsection*{Claude Desktop (stdio transport)}
+
+Claude Desktop's local MCP only speaks \textbf{stdio}, not HTTP \textemdash{} the
+\flag{--stdio} flag binds MCP to stdin/stdout. The HTTP file server still binds to
+\env{MCP\_JSA\_PORT} in the background so the \texttt{/files/*} artifact links the
+chat returns still resolve in your browser.
 
 Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop\_config.json} on macOS (or \fpath{\%APPDATA\%/Claude/claude\_desktop\_config.json} on Windows):
 
@@ -423,7 +428,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
   "mcpServers": {
     "job_ops-mcp": {
       "command": "npx",
-      "args": ["-y", "job_ops-mcp", "start"],
+      "args": ["-y", "job_ops-mcp", "start", "--stdio"],
       "env": {
         "MCP_JSA_PORT": "7891",
         "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
@@ -1191,7 +1196,7 @@ A failing draft is returned to the chat with the specific rule + offending hit s
 \begin{description}
 \item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx job\_ops-mcp start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
 
-\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx job\_ops-mcp doctor} to confirm.
+\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline with the \flag{--stdio} flag; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx job\_ops-mcp doctor} to confirm.
 
 \item[\textit{LibreChat shows ``connected'' but every call fails}] You're in Docker, the LibreChat container can't reach your host's \texttt{127.0.0.1}. Swap to \texttt{host.docker.internal} \textbf{and} add the entry to \texttt{mcpSettings.allowedAddresses}. On Linux, add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to docker-compose.yml.
 

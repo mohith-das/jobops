@@ -116,9 +116,14 @@ async function cmdInit(flags: Map<string, string | boolean>) {
 async function cmdStart(flags: Map<string, string | boolean>) {
   // Default project root = cwd, so users who ran `init` get their files picked up.
   if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
+  const stdio = !!flags.get('stdio');
   const skipBrowserCheck = !!flags.get('skip-chromium-check');
-  if (!skipBrowserCheck) await ensureChromium();
-  await import('./server.js');
+  // In stdio mode we MUST keep stdout clean — `npx playwright install` writes
+  // to stdout and would corrupt the JSON-RPC channel. Force-skip the prompt
+  // there and let the user run `doctor` first to confirm Chromium is installed.
+  if (!skipBrowserCheck && !stdio) await ensureChromium();
+  const { bootServer } = await import('./server.js');
+  await bootServer({ stdio });
 }
 
 async function ensureChromium(): Promise<void> {
@@ -214,28 +219,22 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     url,
   }, null, 2));
 
-  console.log(c.bold('\nClaude Desktop — claude_desktop_config.json:'));
-  console.log(c.dim('macOS: ~/Library/Application Support/Claude/claude_desktop_config.json'));
+  console.log(c.bold('\nClaude Desktop — claude_desktop_config.json (stdio transport):'));
+  console.log(c.dim('macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json'));
   console.log(c.dim('Windows: %APPDATA%/Claude/claude_desktop_config.json\n'));
+  console.log(c.dim('Claude Desktop only speaks MCP over stdio. The --stdio flag binds MCP to'));
+  console.log(c.dim('stdin/stdout; the HTTP file server still runs on the port so /files/* links work.\n'));
   console.log(JSON.stringify({
     mcpServers: {
       'job_ops-mcp': {
         command: 'npx',
-        args:    ['-y', PKG.name, 'start'],
+        args:    ['-y', PKG.name, 'start', '--stdio'],
         env: {
           MCP_JSA_PORT: port,
           MCP_JSA_HOST: host,
           MCP_JSA_PROJECT_ROOT: process.cwd(),
         },
       },
-    },
-  }, null, 2));
-
-  console.log(c.bold('\nClaude Desktop — manual streamable-HTTP (if the npx form is unsupported):'));
-  console.log(c.dim('First boot the server in a separate terminal: `npx job_ops-mcp start`, then:'));
-  console.log(JSON.stringify({
-    mcpServers: {
-      'job_ops-mcp': { transport: { type: 'streamable-http', url } },
     },
   }, null, 2));
 
@@ -325,8 +324,10 @@ COMMANDS
   init              Scaffold cv.md / config/profile.yml / portals.yml from examples
                     and run SQLite migrations. Idempotent.
   start             Boot the MCP + HTTP server. Auto-installs Chromium on first run.
+  start --stdio     Same server, but MCP rides stdin/stdout (for Claude Desktop).
+                    HTTP file server still runs on the port so /files/* links work.
   doctor            Diagnose Node version, Chromium, config files, LLM key.
-  connect           Print copy-paste MCP client config (Claude Desktop + generic).
+  connect           Print copy-paste MCP client config (Claude Desktop + LibreChat).
   help              Show this message.
 
 ENV

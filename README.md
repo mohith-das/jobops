@@ -146,16 +146,16 @@ A working starter is at `.env.example`.
 
 ---
 
-## Wiring it to Claude Desktop
+## Wiring it to Claude Desktop (stdio transport)
 
-`npx job_ops-mcp connect` prints the exact config block. The short version:
+Claude Desktop's local MCP only speaks **stdio**, not HTTP. Use the `--stdio` flag:
 
 ```jsonc
 {
   "mcpServers": {
     "job_ops-mcp": {
       "command": "npx",
-      "args": ["-y", "job_ops-mcp", "start"],
+      "args": ["-y", "job_ops-mcp", "start", "--stdio"],
       "env": {
         "MCP_JSA_PORT": "7891",
         "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
@@ -168,8 +168,16 @@ A working starter is at `.env.example`.
 (Drop into `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
 `%APPDATA%/Claude/claude_desktop_config.json` on Windows. Restart Claude Desktop.)
 
-Generic MCP clients that take a streamable-HTTP URL: point them at
-`http://127.0.0.1:7891/mcp` after `npx job_ops-mcp start` is running.
+In `--stdio` mode the MCP transport rides stdin/stdout (which Claude Desktop drives via
+the `npx` spawn); the HTTP file server still binds to `MCP_JSA_PORT` in the background
+so the `http://127.0.0.1:7891/files/*` links the server returns continue to resolve in
+your browser.
+
+Generic MCP clients that take a streamable-HTTP URL: skip the `--stdio` flag, run
+`npx job_ops-mcp start` in a terminal, and point your client at
+`http://127.0.0.1:7891/mcp`.
+
+`npx job_ops-mcp connect` prints both blocks ready to paste.
 
 ### LibreChat
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { config } from '../../config.js';
 import { getLatestReport } from '../../core/reports.js';
+import { fileUrl } from '../../core/links.js';
 import { defineTool, okResult, errResult } from '../define.js';
 
 export const getReportTool = defineTool({
@@ -17,7 +17,7 @@ export const getReportTool = defineTool({
       report_id: row.id,
       archetype_detected: row.archetype_detected,
       keywords: row.keywords,
-      url: `${config.baseUrl}/files/${row.html_path}`,
+      url: fileUrl(row.html_path),
       created_at: row.created_at,
     });
   },

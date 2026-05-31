@@ -209,6 +209,19 @@ async function cmdDoctor() {
   const visaOn = (process.env.MCP_JSA_VISA_SCORING ?? 'true').toLowerCase() !== 'false';
   console.log(`  ${tick()} visa scoring: ${visaOn ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`);
 
+  // 5b. Public base URL — informational, never a failure.
+  try {
+    const { config: cfg } = await import('./config.js');
+    if (cfg.publicBaseUrlIsExplicit) {
+      console.log(`  ${tick()} public base URL: ${c.bold(cfg.publicBaseUrl)}  (from MCP_JSA_PUBLIC_BASE_URL)`);
+      if (cfg.publicBaseUrl !== cfg.listenUrl) {
+        console.log(`         listen URL is ${cfg.listenUrl} — artifact links will use the public URL above.`);
+      }
+    } else {
+      console.log(`  ${tick()} public base URL: ${cfg.publicBaseUrl}  (default — set MCP_JSA_PUBLIC_BASE_URL to override)`);
+    }
+  } catch { /* config never throws — defensive */ }
+
   // 6. Career-packet staleness check (only meaningful if the DB exists).
   try {
     const { getDb } = await import('./db.js');
@@ -253,9 +266,13 @@ async function cmdDoctor() {
 // ── connect ─────────────────────────────────────────────────────────────────
 
 async function cmdConnect(flags: Map<string, string | boolean>) {
+  // When MCP_JSA_PUBLIC_BASE_URL is set (remote host / Tailscale), use it for the
+  // generic + LibreChat-host config blocks so the URL the user pastes actually
+  // reaches the server from another device. Falls back to host:port for local use.
   const port = String(flags.get('port') ?? process.env.MCP_JSA_PORT ?? '7891');
   const host = String(flags.get('host') ?? process.env.MCP_JSA_HOST ?? '127.0.0.1');
-  const url = `http://${host}:${port}/mcp`;
+  const { config: cfg } = await import('./config.js');
+  const url = cfg.publicBaseUrlIsExplicit ? `${cfg.publicBaseUrl}/mcp` : `http://${host}:${port}/mcp`;
   // Host-resolvable from inside a Docker container (LibreChat default deploy shape).
   // host.docker.internal works out-of-the-box on Docker Desktop (macOS/Windows) and on
   // Linux when the compose file sets `extra_hosts: ["host.docker.internal:host-gateway"]`.

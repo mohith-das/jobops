@@ -8,6 +8,7 @@ import { config } from '../../config.js';
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { safeJson } from '../../core/llm.js';
+import { fileUrl, trackerUrl } from '../../core/links.js';
 
 // Allowed transitions — denylist of obvious impossibilities; we don't enforce a strict
 // state machine because the brief allows manual overrides. The CHECK on jobs.status is
@@ -57,7 +58,7 @@ export const getTopJobsTool = defineTool({
     const items = rows.map(r => {
       const out: any = {
         ...r,
-        report_url: r.report_html ? `${config.baseUrl}/files/${r.report_html}` : null,
+        report_url: r.report_html ? fileUrl(r.report_html) : null,
         report_html: undefined,
       };
       if (!config.visaScoringEnabled) delete out.score_visa_fit;
@@ -100,12 +101,12 @@ export const getTrackerTool = defineTool({
     return okResult({
       counts_by_status: Object.fromEntries(counts.map(c => [c.status, c.n])),
       filtered_count:   rows.length,
-      tracker_url:      `${config.baseUrl}/`,
+      tracker_url:      trackerUrl(),
       items: rows.map(r => ({
         ...r,
-        report_url: r.report_html ? `${config.baseUrl}/files/${r.report_html}` : null,
-        resume_url: r.resume_path ? `${config.baseUrl}/files/${r.resume_path}` : null,
-        cover_url:  r.cover_path  ? `${config.baseUrl}/files/${r.cover_path}`  : null,
+        report_url: r.report_html ? fileUrl(r.report_html) : null,
+        resume_url: r.resume_path ? fileUrl(r.resume_path) : null,
+        cover_url:  r.cover_path  ? fileUrl(r.cover_path)  : null,
         report_html: undefined, resume_path: undefined, cover_path: undefined,
       })),
     });

@@ -37,13 +37,16 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
   const enabled = readEnabledJobs();
 
   const server = app.listen(config.port, config.host, () => {
+    const pubLine = config.publicBaseUrlIsExplicit
+      ? `  · Public URL:     ${config.publicBaseUrl}  (artifact links emit this)`
+      : `  · Public URL:     ${config.publicBaseUrl}  (default — set MCP_JSA_PUBLIC_BASE_URL to override)`;
     const lines = opts.stdio
       ? [
           '',
           `▷ job_ops-mcp stdio mode`,
           `  · MCP transport:  stdin/stdout`,
-          `  · File server:    ${config.baseUrl}/files/*  (for artifact links)`,
-          `  · Tracker UI:     ${config.baseUrl}/`,
+          `  · Listen URL:     ${config.listenUrl}  (HTTP file server bound here)`,
+          pubLine,
           `  · DB:             ${config.dbPath}`,
           `  · Project root:   ${config.projectRoot}`,
           `  · career_packet:  ${seed.created ? `seeded v${seed.version}` : `existing v${seed.version}`}`,
@@ -53,10 +56,11 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
         ]
       : [
           '',
-          `▷ job_ops-mcp listening on ${config.baseUrl}`,
-          `  · MCP endpoint:   ${config.baseUrl}/mcp`,
-          `  · Tracker UI:     ${config.baseUrl}/`,
-          `  · File server:    ${config.baseUrl}/files/*`,
+          `▷ job_ops-mcp listening on ${config.listenUrl}`,
+          `  · MCP endpoint:   ${config.listenUrl}/mcp`,
+          `  · Tracker UI:     ${config.listenUrl}/`,
+          `  · File server:    ${config.listenUrl}/files/*`,
+          pubLine,
           `  · DB:             ${config.dbPath}`,
           `  · Project root:   ${config.projectRoot}`,
           `  · cv.md present:  ${!!files.cvMd}`,

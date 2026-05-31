@@ -3,11 +3,11 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 
-import { config } from '../../config.js';
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { getLatestReport } from '../../core/reports.js';
 import { getMode } from '../../core/modes.js';
+import { trackerUrl } from '../../core/links.js';
 
 // ── extract_stories ──────────────────────────────────────────────────────────
 //
@@ -173,7 +173,7 @@ export const negotiationBriefTool = defineTool({
           'Do not negotiate against yourself',
         ],
       },
-      tracker_url: `${config.baseUrl}/`,
+      tracker_url: trackerUrl(),
     });
   },
 });

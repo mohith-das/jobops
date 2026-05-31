@@ -37,6 +37,7 @@ import { defineTool, okResult, errResult } from '../define.js';
 import { loadProjectFiles } from '../../core/profile.js';
 import { getJobWithCompany } from '../../core/jobs.js';
 import { getSharedBrowser } from '../../core/browser.js';
+import { fileUrl } from '../../core/links.js';
 
 const PREVIEW_SUBDIR = 'previews';
 
@@ -165,9 +166,9 @@ export const applyPrefillTool = defineTool({
         fields_auto_filled:    filled,
         fields_user_must_provide: fields.length - filled,
         fields,
-        resume_url:    app?.resume_path ? `${config.baseUrl}/files/${app.resume_path}` : null,
-        cover_url:     app?.cover_path  ? `${config.baseUrl}/files/${app.cover_path}`  : null,
-        screenshot_url: `${config.baseUrl}/files/${shotPath}`,
+        resume_url:    app?.resume_path ? fileUrl(app.resume_path) : null,
+        cover_url:     app?.cover_path  ? fileUrl(app.cover_path)  : null,
+        screenshot_url: fileUrl(shotPath),
       };
       writeFileSync(absShot.replace(/\.png$/, '.json'), JSON.stringify(previewJson, null, 2), 'utf-8');
 

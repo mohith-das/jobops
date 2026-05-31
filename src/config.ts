@@ -34,7 +34,29 @@ export interface AppConfig {
   dbPath:       string;
   port:         number;
   host:         string;
-  baseUrl:      string;   // http://host:port — embedded in every returned link
+  /**
+   * Where this process actually binds. ALWAYS http://${host}:${port}. Used by the
+   * boot banner and `app.listen()`. NOT used to construct artifact links — that's
+   * `publicBaseUrl`.
+   */
+  listenUrl:    string;
+  /**
+   * The URL emitted in every artifact link (resume / cover / report / tracker /
+   * apply_prefill screenshot). Defaults to `listenUrl` when MCP_JSA_PUBLIC_BASE_URL
+   * is unset, so behaviour is unchanged for local-only users. When set, every link
+   * uses the provided URL instead of 127.0.0.1 — fixes the case where the server
+   * runs on a remote host (e.g. over Tailscale) and links need to be reachable
+   * from other devices.
+   */
+  publicBaseUrl: string;
+  /** True when MCP_JSA_PUBLIC_BASE_URL was explicitly set + parsed OK. */
+  publicBaseUrlIsExplicit: boolean;
+  /**
+   * Legacy alias kept so any caller that imported `config.baseUrl` keeps working.
+   * Mirrors `publicBaseUrl`. New code should use the link helpers in
+   * `core/links.ts` (`fileUrl`, `trackerUrl`) rather than reading this directly.
+   */
+  baseUrl:      string;
   schedulerEnabled: boolean;
   llmProvider:  string;
   llmModel:     string | null;
@@ -71,6 +93,8 @@ export function loadConfig(): AppConfig {
 
   const host = process.env.MCP_JSA_HOST || '127.0.0.1';
   const port = envNum('MCP_JSA_PORT', 7891);
+  const listenUrl = `http://${host}:${port}`;
+  const { publicBaseUrl, publicBaseUrlIsExplicit } = resolvePublicBaseUrl(listenUrl);
 
   return {
     installDir,
@@ -83,12 +107,43 @@ export function loadConfig(): AppConfig {
     dbPath,
     port,
     host,
-    baseUrl: `http://${host}:${port}`,
+    listenUrl,
+    publicBaseUrl,
+    publicBaseUrlIsExplicit,
+    baseUrl: publicBaseUrl,   // back-compat alias
     schedulerEnabled:   envBool('MCP_JSA_SCHEDULER_ENABLED', false),
     llmProvider:        process.env.MCP_JSA_LLM_PROVIDER || 'none',
     llmModel:           process.env.MCP_JSA_LLM_MODEL || null,
     visaScoringEnabled: envBool('MCP_JSA_VISA_SCORING', true),
   };
+}
+
+/**
+ * Validate + normalize MCP_JSA_PUBLIC_BASE_URL. Falls back to listenUrl on any
+ * malformed input (with a stderr warning). Strips trailing slashes.
+ *
+ * Exported so the unit tests can hit it without booting the server.
+ */
+export function resolvePublicBaseUrl(listenUrl: string): { publicBaseUrl: string; publicBaseUrlIsExplicit: boolean } {
+  const raw = process.env.MCP_JSA_PUBLIC_BASE_URL?.trim();
+  if (!raw) return { publicBaseUrl: listenUrl, publicBaseUrlIsExplicit: false };
+  let parsed: URL;
+  try { parsed = new URL(raw); }
+  catch {
+    // eslint-disable-next-line no-console
+    console.error(`[config] WARN: MCP_JSA_PUBLIC_BASE_URL "${raw}" is not a well-formed URL — falling back to ${listenUrl}. Set it to e.g. "http://my-host:7891" or "https://jobs.example.ts.net".`);
+    return { publicBaseUrl: listenUrl, publicBaseUrlIsExplicit: false };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    // eslint-disable-next-line no-console
+    console.error(`[config] WARN: MCP_JSA_PUBLIC_BASE_URL "${raw}" uses protocol "${parsed.protocol}" — only http: and https: are supported. Falling back to ${listenUrl}.`);
+    return { publicBaseUrl: listenUrl, publicBaseUrlIsExplicit: false };
+  }
+  // Reconstruct origin + optional pathname, stripping trailing slash. Drop any
+  // query/hash since the server emits paths under /files/ etc.
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  const cleaned  = `${parsed.protocol}//${parsed.host}${pathname}`;
+  return { publicBaseUrl: cleaned, publicBaseUrlIsExplicit: true };
 }
 
 export const config = loadConfig();

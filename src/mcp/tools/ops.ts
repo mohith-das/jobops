@@ -5,13 +5,13 @@
 import { z } from 'zod';
 import { randomUUID, createHash } from 'node:crypto';
 
-import { config } from '../../config.js';
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { chatLogged, llmAvailable, COST_TABLE, estimateCostUsd } from '../../core/llm.js';
 import { getActiveCareerPacket } from '../../core/profile.js';
 import { getMode } from '../../core/modes.js';
 import { findCompanyByName } from '../../core/jobs.js';
+import { fileUrl, trackerUrl } from '../../core/links.js';
 
 // ── evaluate_training ────────────────────────────────────────────────────────
 
@@ -219,14 +219,14 @@ export const dailyDigestTool = defineTool({
       new_top_jobs:   newTop.map(j => ({
         ...j,
         report_html: undefined,
-        report_url:  j.report_html ? `${config.baseUrl}/files/${j.report_html}` : null,
+        report_url:  j.report_html ? fileUrl(j.report_html) : null,
       })),
       followups_due:  followups,
       status_changes: recentStatusChanges,
       llm_cost_window: {
         calls: costRow.calls, input_chars: costRow.in_chars, output_chars: costRow.out_chars,
       },
-      tracker_url: `${config.baseUrl}/`,
+      tracker_url: trackerUrl(),
     });
   },
 });

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { config } from '../config.js';
 import { getDb, runInWriteLock } from '../db.js';
 import { escapeHtml } from './html.js';
+import { fileUrl } from './links.js';
 import { themeCss, themeInitScript, themeToggleButton } from '../http/theme.js';
 
 export interface ReportBlocks {
@@ -120,7 +121,7 @@ export async function saveReport(args: {
       id,
       relativeHtmlPath,
       absoluteHtmlPath,
-      url: `${config.baseUrl}/files/${relativeHtmlPath}`,
+      url: fileUrl(relativeHtmlPath),
     };
   });
 }

@@ -157,6 +157,7 @@ roles where sponsorship is a non-issue — turn it off; the rest of the system w
 | `MCP_JSA_DATA_DIR` | `<install>/data` | SQLite + WAL location |
 | `MCP_JSA_OUTPUT_DIR` | `<install>/output` | Rendered artifacts (PDFs, report HTML) |
 | `MCP_JSA_VISA_SCORING` | `true` | Set `false` to drop visa surface entirely (see above) |
+| `MCP_JSA_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
 | `MCP_JSA_LLM_PROVIDER` | `gemini` | Used only by `api`/batch paths: `gemini`, `deepseek`, `none` |
 | `MCP_JSA_LLM_MODEL` | _empty_ | Provider-specific model id |
 | `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials |
@@ -272,6 +273,52 @@ chat client uses those to score + draft the 6 blocks.
 ```
 
 Server persists, renders HTML at `/files/reports/<id>.html`, returns the URL.
+
+---
+
+## Running on a remote host / Tailscale
+
+By default every artifact link the server returns starts with `http://127.0.0.1:<port>`.
+That's fine when you run server + chat on the same machine. If you run the server on a
+cloud instance, a homelab box, or anything you reach over Tailscale / LAN / a tunnel,
+`127.0.0.1` on the link resolves to your *chat machine* — not the server — and the
+links don't work.
+
+Set `MCP_JSA_PUBLIC_BASE_URL` to the URL the chat machine actually uses to reach the
+server:
+
+```bash
+# Tailscale magic DNS
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+
+# Tailscale 100.x IP
+export MCP_JSA_PUBLIC_BASE_URL="http://100.64.0.5:7891"
+
+# LAN IP
+export MCP_JSA_PUBLIC_BASE_URL="http://192.168.1.20:7891"
+
+# Reverse proxy
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.com"
+```
+
+Every artifact link (resume PDF, .tex, .docx, eval report, apply_prefill screenshot,
+tracker URL) now uses that base. **No other behaviour changes** — the server still binds
+to `MCP_JSA_HOST` (default `127.0.0.1`); to actually accept connections from other
+devices, also set `MCP_JSA_HOST=0.0.0.0`. `npx job_ops-mcp doctor` prints the
+effective public base URL so you can confirm what your links will look like.
+
+A malformed value (e.g. `not-a-url`) is rejected at boot with a warning on stderr; the
+server keeps running with the default 127.0.0.1 base. Trailing slashes are stripped.
+
+### Security note
+
+This setting **only changes the URLs the server emits in responses**. It does not add
+authentication and does not change the bind address. If you set `MCP_JSA_HOST=0.0.0.0`
+so the server accepts remote connections, the HTTP file server then serves your resume
+PDFs, cover letters, eval reports, LinkedIn-derived data, and H1B-derived data **without
+authentication** to anyone who can reach the port. Restrict access to a private network
+(Tailscale, a VPN, a reverse proxy with auth) — never expose this directly on the public
+internet.
 
 ---
 

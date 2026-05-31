@@ -26,6 +26,7 @@ import { getJob } from '../../core/jobs.js';
 import { parseCV } from '../../core/cv_parse.js';
 import { scanForVisaLeakage } from '../../core/outreach_safety.js';
 import { safeJson } from '../../core/llm.js';
+import { fileUrl } from '../../core/links.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ async function writeText(
   const rel = `${subdir}/${filename}`;
   return {
     kind, format, path: rel,
-    url:   `${config.baseUrl}/files/${rel}`,
+    url:   fileUrl(rel),
     bytes: Buffer.byteLength(content, 'utf-8'),
   };
 }
@@ -187,7 +188,7 @@ async function writeBinary(
   const rel = `${subdir}/${filename}`;
   return {
     kind, format, path: rel,
-    url:   `${config.baseUrl}/files/${rel}`,
+    url:   fileUrl(rel),
     bytes: buf.length,
   };
 }

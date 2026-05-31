@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.3.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.5.1} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -415,6 +415,7 @@ All optional. Defaults in parens.
 \env{MCP\_JSA\_DATA\_DIR}         & SQLite location. \textit{(\texttt{<project\_root>/data})} \\
 \env{MCP\_JSA\_OUTPUT\_DIR}       & Where generated PDFs and report HTML land. \textit{(\texttt{<project\_root>/output})} \\
 \env{MCP\_JSA\_VISA\_SCORING}     & Set to \texttt{false} to drop the visa surface entirely (see \S\ref{sec:custom}). \textit{(true)} \\
+\env{MCP\_JSA\_PUBLIC\_BASE\_URL} & Public URL emitted in artifact links. Set when running on a remote host (Tailscale / LAN / cloud) so links are reachable from your chat machine. See \S\ref{sec:remote-host}. \textit{(default: \texttt{http://127.0.0.1:<port>})} \\
 \env{MCP\_JSA\_LLM\_PROVIDER}     & \texttt{gemini} \textbar{} \texttt{deepseek} \textbar{} \texttt{none}. \textit{(gemini)} \\
 \env{MCP\_JSA\_LLM\_MODEL}        & Provider-specific model id. \textit{(empty \textrightarrow{} provider default)} \\
 \env{GEMINI\_API\_KEY}            & Gemini key. Needed only for \texttt{api}/batch paths. \\
@@ -488,6 +489,49 @@ mcpSettings:
 LibreChat blocks private / internal addresses by default as SSRF protection. Without the \texttt{mcpSettings.allowedAddresses} entry, your MCP server will appear ``connected'' but every tool call will silently fail.
 
 On Linux, \texttt{host.docker.internal} doesn't resolve out of the box. Either add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to the LibreChat service in your \fpath{docker-compose.yml}, or swap the URL for your host's LAN IP and allowlist that IP:port instead.
+\end{warnbox}
+
+\subsection*{Running on a remote host / Tailscale}\label{sec:remote-host}
+
+By default every artifact link the server returns starts with \texttt{http://127.0.0.1:<port>}.
+That's fine when you run server + chat on the same machine. If you run the server on a
+cloud instance, a homelab box, or anything you reach over Tailscale / LAN / a tunnel,
+\texttt{127.0.0.1} on the link resolves to your \textit{chat machine} \textemdash{} not the
+server \textemdash{} and the links don't work.
+
+Set \env{MCP\_JSA\_PUBLIC\_BASE\_URL} to the URL the chat machine actually uses to reach
+the server:
+
+\begin{lstlisting}[language=bashplus]
+# Tailscale magic DNS
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+
+# Tailscale 100.x IP
+export MCP_JSA_PUBLIC_BASE_URL="http://100.64.0.5:7891"
+
+# LAN IP
+export MCP_JSA_PUBLIC_BASE_URL="http://192.168.1.20:7891"
+
+# Reverse proxy
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.com"
+\end{lstlisting}
+
+Every artifact link (resume PDF, .tex, .docx, eval report, apply\_prefill screenshot,
+tracker URL) now uses that base. No other behaviour changes \textemdash{} the server still
+binds to \env{MCP\_JSA\_HOST} (default \texttt{127.0.0.1}); to accept connections from other
+devices, also set \env{MCP\_JSA\_HOST=0.0.0.0}. \cmd{npx job\_ops-mcp doctor} prints the
+effective public base URL so you can confirm what your links will look like. A malformed
+value is rejected at boot with a warning on stderr; the server keeps running with the
+default 127.0.0.1 base. Trailing slashes are stripped.
+
+\begin{warnbox}[Exposing beyond localhost]
+This setting only changes the URLs the server emits. It does NOT add authentication and
+does NOT change the bind address. If you set \env{MCP\_JSA\_HOST=0.0.0.0} so the server
+accepts remote connections, the HTTP file server then serves your resume PDFs, cover
+letters, eval reports, LinkedIn-derived data, and H1B-derived data \textbf{without
+authentication} to anyone who can reach the port. Restrict access to a private network
+(Tailscale, a VPN, a reverse proxy with auth) \textemdash{} never expose this directly on the
+public internet.
 \end{warnbox}
 
 \subsection*{Optional: enable the LLM API path}
@@ -1269,7 +1313,7 @@ If you find yourself \textbf{tweaking the rubric instead of clicking send}, the 
 \vfill
 \begin{flushright}
 \small\color{black!50}\sffamily
-job\_ops-mcp \textbullet{} v0.3.0 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
+job\_ops-mcp \textbullet{} v0.5.1 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
 \end{flushright}
 
 \end{document}

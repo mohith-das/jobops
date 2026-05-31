@@ -12,13 +12,13 @@
 
 import { z } from 'zod';
 
-import { config } from '../../config.js';
 import { adoptJobFromJD, getJob } from '../../core/jobs.js';
 import { normalizeJD } from '../../core/jd_normalize.js';
 import { saveReport, type ReportBlocks } from '../../core/reports.js';
 import { getActiveCareerPacket } from '../../core/profile.js';
 import { chatLogged } from '../../core/llm.js';
 import { getMode } from '../../core/modes.js';
+import { trackerUrl } from '../../core/links.js';
 import { defineTool, okResult, errResult } from '../define.js';
 
 const reportBlocks = {
@@ -86,7 +86,7 @@ export const evaluateJobTool = defineTool({
         job_id: job.id,
         report_id: saved.id,
         report_url: saved.url,
-        tracker_url: `${config.baseUrl}/`,
+        tracker_url: trackerUrl(),
       });
     }
 
@@ -167,7 +167,7 @@ export const evaluateJobTool = defineTool({
         blocks_parse_ok:  blocksCall.parseOk,
         scoring_parse_error: scoreCall.parseError ?? null,
         blocks_parse_error:  blocksCall.parseError ?? null,
-        tracker_url: `${config.baseUrl}/`,
+        tracker_url: trackerUrl(),
       });
     } catch (e: any) {
       return errResult(`api-mode evaluate_job failed: ${e?.message ?? String(e)}`);

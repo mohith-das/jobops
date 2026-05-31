@@ -15,7 +15,7 @@ export function buildHttpApp(): Express {
   app.use(express.json({ limit: '4mb' }));
 
   app.get('/healthz', (_req: Request, res: Response) => {
-    res.json({ ok: true, baseUrl: config.baseUrl });
+    res.json({ ok: true, listenUrl: config.listenUrl, publicBaseUrl: config.publicBaseUrl });
   });
 
   app.get('/', (_req: Request, res: Response) => {

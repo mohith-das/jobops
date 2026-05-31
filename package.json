@@ -1,6 +1,6 @@
 {
   "name": "job_ops-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Self-hosted MCP server for the full job-search loop: portal scanning, JD evaluation, tailored resume + cover PDFs, outreach drafting, story bank, negotiation brief — chat-driven, human-in-the-loop.",
   "type": "module",
   "private": false,
@@ -14,8 +14,16 @@
     "url": "https://github.com/mohith-das/job_ops-mcp/issues"
   },
   "keywords": [
-    "mcp", "model-context-protocol", "claude", "job-search", "resume",
-    "cover-letter", "ats", "career", "agent", "playwright"
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "job-search",
+    "resume",
+    "cover-letter",
+    "ats",
+    "career",
+    "agent",
+    "playwright"
   ],
   "bin": {
     "job_ops-mcp": "dist/cli.js",

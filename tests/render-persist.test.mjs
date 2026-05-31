@@ -43,8 +43,8 @@ test('creates an application row with paths when none exists; advances status', 
 
   const jobId = await seedJob('Builder PM', 'Vercel');
   const result = await persistRenderedFiles(jobId, [
-    { kind: 'resume', path: 'pdfs/resume-builder-pm-abcd1234.pdf' },
-    { kind: 'cover',  path: 'pdfs/cover-builder-pm-abcd1234.pdf'  },
+    { kind: 'resume', format: 'pdf', path: 'pdfs/resume-builder-pm-abcd1234.pdf' },
+    { kind: 'cover',  format: 'pdf', path: 'pdfs/cover-builder-pm-abcd1234.pdf'  },
   ]);
 
   assert.equal(result.status, 'ready_to_review');
@@ -75,8 +75,8 @@ test('updates existing application row; advances status from materials_drafted',
   `).run(appId, jobId);
 
   const r = await persistRenderedFiles(jobId, [
-    { kind: 'resume', path: 'pdfs/r.pdf' },
-    { kind: 'cover',  path: 'pdfs/c.pdf'  },
+    { kind: 'resume', format: 'pdf', path: 'pdfs/r.pdf' },
+    { kind: 'cover',  format: 'pdf', path: 'pdfs/c.pdf'  },
   ]);
   assert.equal(r.application_id, appId, 'must reuse existing application row');
   assert.equal(r.status, 'ready_to_review');
@@ -97,7 +97,7 @@ test('does NOT move terminal-state jobs backwards', async () => {
   `).run(appId, jobId);
 
   const r = await persistRenderedFiles(jobId, [
-    { kind: 'resume', path: 'pdfs/re-render.pdf' },
+    { kind: 'resume', format: 'pdf', path: 'pdfs/re-render.pdf' },
   ]);
   assert.equal(r.status, 'applied',         'must NOT move applied → ready_to_review');
   assert.equal(r.status_advanced, false);
@@ -115,10 +115,10 @@ test('rendering only cover does not NULL-out an existing resume_path', async () 
 
   const jobId = await seedJob('Solutions Engineer', 'Loop');
   await persistRenderedFiles(jobId, [
-    { kind: 'resume', path: 'pdfs/first-resume.pdf' },
+    { kind: 'resume', format: 'pdf', path: 'pdfs/first-resume.pdf' },
   ]);
   await persistRenderedFiles(jobId, [
-    { kind: 'cover', path: 'pdfs/cover-only.pdf' },
+    { kind: 'cover', format: 'pdf', path: 'pdfs/cover-only.pdf' },
   ]);
   const row = getDb().prepare(`SELECT resume_path, cover_path FROM applications WHERE job_id = ?`).get(jobId);
   assert.equal(row.resume_path, 'pdfs/first-resume.pdf', 'must preserve previous resume_path');

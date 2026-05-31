@@ -57,6 +57,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "better-sqlite3": "^11.3.0",
+    "docx": "^9.7.1",
     "express": "^4.21.0",
     "js-yaml": "^4.1.0",
     "playwright": "^1.48.0",

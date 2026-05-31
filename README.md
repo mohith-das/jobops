@@ -87,7 +87,7 @@ without one.
 | Group | Tools |
 |---|---|
 | **Evaluation** | `evaluate_job`, `batch_evaluate`, `get_top_jobs`, `evaluate_training`, `evaluate_project` |
-| **Materials** | `generate_materials`, `render_pdf`, `get_report` |
+| **Materials** | `generate_materials`, `render_pdf` (PDF / `.tex` / `.docx`), `get_report` |
 | **Tracker** | `get_tracker`, `update_status`, `mark_ready_to_apply` |
 | **Sourcing** | `scan_portals` (Greenhouse + Ashby + Lever + Workday + Amazon + Google + generic Playwright) |
 | **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
@@ -272,6 +272,43 @@ chat client uses those to score + draft the 6 blocks.
 ```
 
 Server persists, renders HTML at `/files/reports/<id>.html`, returns the URL.
+
+---
+
+## Downloadable, editable source formats
+
+`render_pdf` produces the resume and cover in any subset of three formats:
+
+| Format | Where it lands  | Use it for                                                    |
+|--------|-----------------|---------------------------------------------------------------|
+| `pdf`  | `/files/pdfs/`  | The deliverable. Light/white background, ATS-clean.           |
+| `tex`  | `/files/tex/`   | The editable LaTeX source. Compiles with vanilla `pdflatex`.  |
+| `docx` | `/files/docx/`  | Word / Google Docs editing. Real headings + bullets, ATS-safe. |
+
+Default is `formats: ["pdf"]` for back-compat. Request any subset:
+
+```jsonc
+{
+  "method": "tools/call",
+  "params": {
+    "name": "render_pdf",
+    "arguments": {
+      "job_id": "<from evaluate_job>",
+      "kind":    "both",
+      "formats": ["pdf", "tex", "docx"],
+      "cover_body": "I am reaching out about ..."
+    }
+  }
+}
+```
+
+All URLs persist onto the application row in the `rendered_files` JSON column so
+`get_tracker`, `apply_prefill`, and `daily_digest` can find them later. Re-rendering
+one format merges into the existing map — never clobbers the others.
+
+The `.tex` and `.docx` are built from the same parsed `cv.md` and `cover_body` the
+PDF uses, so editing and recompiling the `.tex` reproduces the same document. The
+visa-leakage rail runs against every output format before files are written.
 
 ---
 

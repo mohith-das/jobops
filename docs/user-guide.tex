@@ -685,7 +685,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 
 \begin{description}[leftmargin=0pt]
 \item[\tool{generate\_materials}] Picks bullets / tagline / projects from \fpath{career\_packet.md} per the JD via the tailoring rules. Writes \texttt{applications.tailored\_bullets} + \texttt{cover\_letter\_draft}, validates against the visa rail before persisting. Two-step chat shape; \texttt{api} mode auto-validates LLM output.
-\item[\tool{render\_pdf}] Chromium HTML\textrightarrow{}PDF. \texttt{kind: resume | cover | both}, optional \texttt{cover\_body}, \texttt{page\_format}. Returns localhost link(s). Scans \texttt{cover\_body} for visa leakage before render \textemdash{} fails loud if a leak slips through.
+\item[\tool{render\_pdf}] Produces resume + cover in any subset of \texttt{\{pdf, tex, docx\}} via the \texttt{formats} param (default \texttt{["pdf"]}). PDF is HTML\textrightarrow{}Chromium; \texttt{.tex} is a self-contained pdflatex source you can edit and recompile; \texttt{.docx} is generated with the docx library for Word / Google Docs editing. All three share the same tailored content. URLs persist onto the application row's \texttt{rendered\_files} JSON. The visa-leakage rail runs against every output before any file is written. Files land under \fpath{/files/pdfs/}, \fpath{/files/tex/}, \fpath{/files/docx/}.
 \item[\tool{get\_report}] Returns the localhost URL + metadata for the latest \texttt{eval\_report} of a \texttt{job\_id}.
 \end{description}
 

@@ -69,6 +69,20 @@ export interface AppConfig {
    * Useful for users who don't need visa signal (US citizens / non-US users / etc.).
    */
   visaScoringEnabled: boolean;
+  /**
+   * Optional user-owned directory holding additional theme dirs (one per theme,
+   * matching the structure of `<install>/templates/themes/`). The loader
+   * searches here FIRST, so a `default/` subdirectory in here overrides the
+   * bundled default. Themes that only exist here are also available. When
+   * unset, only bundled themes are visible.
+   */
+  userTemplateDir: string | null;
+  /**
+   * Name of the theme used when render_pdf is called without an explicit
+   * `template` argument. Defaults to "default". If the configured value is
+   * missing on disk the renderer falls back to "default" with a stderr warning.
+   */
+  defaultTemplate: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -115,6 +129,10 @@ export function loadConfig(): AppConfig {
     llmProvider:        process.env.MCP_JSA_LLM_PROVIDER || 'none',
     llmModel:           process.env.MCP_JSA_LLM_MODEL || null,
     visaScoringEnabled: envBool('MCP_JSA_VISA_SCORING', true),
+    userTemplateDir:    process.env.MCP_JSA_TEMPLATE_DIR
+                          ? abs(process.env.MCP_JSA_TEMPLATE_DIR, process.cwd())
+                          : null,
+    defaultTemplate:    (process.env.MCP_JSA_DEFAULT_TEMPLATE || 'default').trim() || 'default',
   };
 }
 

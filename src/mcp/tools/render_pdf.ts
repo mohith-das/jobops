@@ -27,6 +27,7 @@ import { parseCV } from '../../core/cv_parse.js';
 import { scanForVisaLeakage } from '../../core/outreach_safety.js';
 import { safeJson } from '../../core/llm.js';
 import { fileUrl } from '../../core/links.js';
+import { effectiveDefaultTemplate, resolveTheme } from '../../core/templates.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,8 @@ export const renderPdfTool = defineTool({
                   .describe('Subset of {pdf, tex, docx}. Default ["pdf"].'),
     cover_body:  z.string().optional().describe('Plain-prose cover letter body (required when kind includes cover). 250-350 words.'),
     page_format: z.enum(['a4', 'letter']).default('letter'),
+    template:    z.string().optional()
+                  .describe('Named theme (see `job_ops-mcp templates`). Searches MCP_JSA_TEMPLATE_DIR then bundled themes. Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". Affects .tex and .pdf only — .docx is procedurally generated.'),
   },
   handler: async (args) => {
     try {
@@ -80,6 +83,13 @@ export const renderPdfTool = defineTool({
       const cover_company  = (job as any).company_name_raw ?? '';
       const cover_location = (job as any).location_raw ?? '';
 
+      // Resolve the theme once up-front so a typo errors clearly BEFORE any file
+      // is written (and BEFORE Playwright spins up Chromium). Falls through to
+      // the default when the param is unset.
+      const themeName = args.template ?? effectiveDefaultTemplate();
+      try { resolveTheme(themeName); }
+      catch (err: any) { return errResult(err?.message ?? String(err)); }
+
       const artifacts: RenderedArtifact[] = [];
 
       // PDF path — runs first because it brings up Playwright once for both kinds.
@@ -89,6 +99,7 @@ export const renderPdfTool = defineTool({
           kind:        args.kind,
           cover_body:  args.cover_body,
           page_format: args.page_format,
+          theme:       themeName,
         });
         for (const f of pdfFiles) {
           artifacts.push({ kind: f.kind, format: 'pdf', path: f.path, url: f.url, bytes: f.bytes });
@@ -97,10 +108,10 @@ export const renderPdfTool = defineTool({
 
       // .tex path — pure text, fast.
       if (formats.includes('tex')) {
-        if (kinds.includes('resume')) artifacts.push(await writeText('tex', 'resume', args.job_id, job.title, buildResumeTex()));
+        if (kinds.includes('resume')) artifacts.push(await writeText('tex', 'resume', args.job_id, job.title, buildResumeTex({ theme: themeName })));
         if (kinds.includes('cover')) {
           if (!args.cover_body) throw new Error('cover_body required when kind includes cover');
-          const tex = buildCoverTex({ body: args.cover_body, company: cover_company, location: cover_location });
+          const tex = buildCoverTex({ body: args.cover_body, company: cover_company, location: cover_location }, { theme: themeName });
           // Whole-file visa scan for the .tex — defense in depth (cover_body already
           // scanned upstream, but the resume.tex might inadvertently inherit terms).
           const leaks = scanForVisaLeakage(tex);
@@ -129,6 +140,7 @@ export const renderPdfTool = defineTool({
 
       return okResult({
         job_id: args.job_id,
+        template: themeName,
         formats_requested: formats,
         files: artifacts.map(a => ({ kind: a.kind, format: a.format, url: a.url, bytes: a.bytes, path: a.path })),
         application_id: persisted.application_id,

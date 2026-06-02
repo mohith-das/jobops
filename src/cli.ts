@@ -209,6 +209,25 @@ async function cmdDoctor() {
   const visaOn = (process.env.MCP_JSA_VISA_SCORING ?? 'true').toLowerCase() !== 'false';
   console.log(`  ${tick()} visa scoring: ${visaOn ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`);
 
+  // 5a. Templates — informational. List bundled + user themes and the active default.
+  try {
+    const { listThemes, effectiveDefaultTemplate } = await import('./core/templates.js');
+    const themes = listThemes();
+    const def    = effectiveDefaultTemplate();
+    const userCount    = themes.filter(t => t.source === 'user').length;
+    const bundledCount = themes.length - userCount;
+    const userPart = userCount ? `, ${userCount} user` : '';
+    console.log(`  ${tick()} templates: ${bundledCount} bundled${userPart} — default: ${c.bold(def)}`);
+    if (process.env.MCP_JSA_DEFAULT_TEMPLATE && process.env.MCP_JSA_DEFAULT_TEMPLATE !== def) {
+      console.log(`         ${c.yellow('!')} MCP_JSA_DEFAULT_TEMPLATE="${process.env.MCP_JSA_DEFAULT_TEMPLATE}" not found, falling back to "${def}".`);
+    }
+    if (!process.env.MCP_JSA_TEMPLATE_DIR) {
+      console.log(`         ${c.dim('set MCP_JSA_TEMPLATE_DIR to add a user themes dir — see TEMPLATES.md.')}`);
+    }
+  } catch (e: any) {
+    console.log(`  ${warn()} templates check failed: ${e?.message ?? e}`);
+  }
+
   // 5b. Public base URL — informational, never a failure.
   try {
     const { config: cfg } = await import('./config.js');
@@ -381,6 +400,50 @@ function yamlBlock(o: unknown, indent = 0): string {
   return JSON.stringify(o);
 }
 
+// ── templates ───────────────────────────────────────────────────────────────
+
+async function cmdTemplates() {
+  if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
+  console.log(c.bold('\njob_ops-mcp templates\n'));
+  const { config: cfg } = await import('./config.js');
+  const { listThemes, effectiveDefaultTemplate } = await import('./core/templates.js');
+
+  const themes  = listThemes();
+  const def     = effectiveDefaultTemplate();
+  const userDir = cfg.userTemplateDir;
+
+  console.log(c.dim(`default theme: ${c.bold(def)}  ${process.env.MCP_JSA_DEFAULT_TEMPLATE ? '(from MCP_JSA_DEFAULT_TEMPLATE)' : '(built-in default)'}`));
+  console.log(c.dim(`bundled themes dir: ${cfg.installDir}/templates/themes`));
+  console.log(c.dim(`user themes dir:    ${userDir ?? '(unset — set MCP_JSA_TEMPLATE_DIR to add custom themes)'}\n`));
+
+  if (themes.length === 0) {
+    console.log(c.red('No themes found.'));
+    return;
+  }
+
+  for (const t of themes) {
+    const tag       = t.source === 'user' ? c.bold(c.yellow('[user]')) : c.dim('[bundled]');
+    const isDefault = t.name === def ? c.green(' (default)') : '';
+    const files     = Object.keys(t.files).sort().join(', ');
+    console.log(`  ${tag}  ${c.bold(t.name)}${isDefault}`);
+    console.log(`           ${c.dim(t.dir)}`);
+    console.log(`           ${c.dim(`files: ${files}`)}\n`);
+  }
+
+  if (userDir) {
+    // Surface any name collision so the user understands which one wins.
+    const userNames    = themes.filter(t => t.source === 'user').map(t => t.name);
+    const bundledNames = themes.filter(t => t.source === 'bundled').map(t => t.name);
+    const shadows = userNames.filter(n => bundledNames.includes(n));
+    if (shadows.length) {
+      console.log(c.dim(`Note: user theme(s) ${shadows.join(', ')} would shadow a bundled theme of the same name. Listed once above with [user].\n`));
+    }
+  }
+  console.log(c.dim(`Use a theme: pass template="<name>" to render_pdf, or set MCP_JSA_DEFAULT_TEMPLATE.`));
+  console.log(c.dim(`Author a new theme: see TEMPLATES.md (placeholder contract).`));
+  console.log('');
+}
+
 // ── reseed ──────────────────────────────────────────────────────────────────
 
 async function cmdReseed(flags: Map<string, string | boolean>) {
@@ -431,6 +494,7 @@ COMMANDS
                     HTTP file server still runs on the port so /files/* links work.
   reseed            Rebuild the active career_packet from the current cv.md +
                     config/profile.yml. Run this after editing cv.md.
+  templates         List available resume/cover themes (bundled + user dir).
   doctor            Diagnose Node version, Chromium, config files, LLM key.
   connect           Print copy-paste MCP client config (Claude Desktop + LibreChat).
   help              Show this message.
@@ -442,6 +506,8 @@ ENV
                                default: current working dir
   MCP_JSA_DATA_DIR             SQLite location; default <install>/data
   MCP_JSA_VISA_SCORING         true | false (default true) — disables visa surface entirely
+  MCP_JSA_TEMPLATE_DIR         user-owned dir holding additional themes (overrides bundled)
+  MCP_JSA_DEFAULT_TEMPLATE     theme name when render_pdf has no template arg (default "default")
   MCP_JSA_LLM_PROVIDER         gemini | deepseek | none  (api/batch tools only)
   GEMINI_API_KEY / DEEPSEEK_API_KEY
 
@@ -460,7 +526,8 @@ async function main() {
       case 'start':   await cmdStart(flags);   break;
       case 'doctor':  await cmdDoctor();       break;
       case 'connect': await cmdConnect(flags); break;
-      case 'reseed':  await cmdReseed(flags);  break;
+      case 'reseed':    await cmdReseed(flags);   break;
+      case 'templates': await cmdTemplates();     break;
       case '--version': case '-v': case 'version': console.log(PKG.version); break;
       case 'help':    case '--help': case '-h': default: cmdHelp(); break;
     }

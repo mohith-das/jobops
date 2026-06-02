@@ -5,7 +5,7 @@
 // The CV template lives in templates/cv-template.html. Fonts live in fonts/ and are
 // referenced from the template via ./fonts/*; we resolve them to absolute file:// URLs
 // before letting Chromium render.
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Browser } from 'playwright';
@@ -16,17 +16,15 @@ import { getJob } from './jobs.js';
 import { escapeHtml } from './html.js';
 import { scanForVisaLeakage } from './outreach_safety.js';
 import { getSharedBrowser, closeSharedBrowser } from './browser.js';
+import { loadTemplate, effectiveDefaultTemplate } from './templates.js';
 
-// Templates are static — load once.
-let _cvTplCache:    string | null = null;
-let _coverTplCache: string | null = null;
-function loadCvTemplate(): string {
-  if (_cvTplCache) return _cvTplCache;
-  return _cvTplCache = readFileSync(resolve(config.templatesDir, 'cv-template.html'), 'utf-8');
+// Templates are looked up per-theme; the loader does its own cache where useful.
+// We resolve fresh on each call so a theme change is picked up immediately.
+function loadCvTemplate(theme: string): string {
+  return loadTemplate(theme, 'resume.html').body;
 }
-function loadCoverTemplate(): string {
-  if (_coverTplCache) return _coverTplCache;
-  return _coverTplCache = readFileSync(resolve(config.templatesDir, 'cover-template.html'), 'utf-8');
+function loadCoverTemplate(theme: string): string {
+  return loadTemplate(theme, 'cover.html').body;
 }
 
 // Re-exported for `src/server.ts` shutdown, which still passes through this module.
@@ -39,6 +37,8 @@ export interface RenderArgs {
   kind:   'resume' | 'cover' | 'both';
   cover_body?: string;     // milestone 1 takes whatever the chat sends; m2 reads applications.cover_letter_draft
   page_format?: 'a4' | 'letter';
+  /** Theme name (see core/templates.ts). Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+  theme?: string;
 }
 
 export interface RenderedFile {
@@ -60,23 +60,29 @@ export async function renderPdf(args: RenderArgs): Promise<RenderedFile[]> {
     if (leaks.length) throw new Error(`render_pdf: cover_body failed visa rail — ${JSON.stringify(leaks)}`);
   }
   const format = args.page_format ?? 'letter';
+  const theme  = args.theme ?? effectiveDefaultTemplate();
   const cv = parseCV();
 
   const outputs: RenderedFile[] = [];
   const browser = await getSharedBrowser();
 
   if (args.kind === 'resume' || args.kind === 'both') {
-    const html = renderResumeHtml(cv);
+    let html: string;
+    try { html = renderResumeHtml(cv, theme); }
+    catch (err: any) { throw new Error(`render_pdf (theme="${theme}", kind=resume): ${err?.message ?? err}`); }
     const file = await writeAndPdf(browser, html, `resume-${slug(job.title)}-${args.job_id.slice(0, 8)}.pdf`, format);
     outputs.push({ kind: 'resume', ...file });
   }
   if (args.kind === 'cover' || args.kind === 'both') {
     if (!args.cover_body) throw new Error('render_pdf: kind=cover|both requires cover_body');
-    const html = renderCoverHtml(cv, {
-      company:  job.company_name_raw,
-      location: job.location_raw ?? '',
-      body:     args.cover_body,
-    });
+    let html: string;
+    try {
+      html = renderCoverHtml(cv, {
+        company:  job.company_name_raw,
+        location: job.location_raw ?? '',
+        body:     args.cover_body,
+      }, theme);
+    } catch (err: any) { throw new Error(`render_pdf (theme="${theme}", kind=cover): ${err?.message ?? err}`); }
     const file = await writeAndPdf(browser, html, `cover-${slug(job.title)}-${args.job_id.slice(0, 8)}.pdf`, format);
     outputs.push({ kind: 'cover', ...file });
   }
@@ -85,8 +91,8 @@ export async function renderPdf(args: RenderArgs): Promise<RenderedFile[]> {
 
 // ── Template fill ────────────────────────────────────────────────────────────
 
-function renderResumeHtml(cv: CVData): string {
-  const tpl = loadCvTemplate();
+function renderResumeHtml(cv: CVData, theme: string): string {
+  const tpl = loadCvTemplate(theme);
   const replacements: Record<string, string> = {
     LANG:               'en',
     NAME:               cv.name,
@@ -172,8 +178,8 @@ function renderSkills(skills: { category: string; items: string }[]): string {
   </div>`;
 }
 
-function renderCoverHtml(cv: CVData, args: { company: string; location: string; body: string }): string {
-  const tpl = loadCoverTemplate();
+function renderCoverHtml(cv: CVData, args: { company: string; location: string; body: string }, theme: string): string {
+  const tpl = loadCoverTemplate(theme);
   const contactBits = [cv.phone, cv.email, cv.linkedin_display, cv.portfolio_display].filter(Boolean);
   const body = args.body
     .split(/\n{2,}/)

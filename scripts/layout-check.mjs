@@ -157,9 +157,73 @@ const SHORT_COVER = `I am reaching out about the Builder PM role at Pinch AI. I 
 
 // ── Scenarios ──────────────────────────────────────────────────────────────
 
+// Author a custom user theme into the sandbox so we can verify the loader
+// path + assert a custom theme compiles cleanly. The theme is a stripped-down
+// "compact" layout that only emits HEADER + Experience + Education — proving
+// that omitting placeholders is graceful, and that the renderer can still
+// produce a pdflatex-compatible document under a user dir.
+const USER_THEMES = resolve(SBOX, 'my-themes');
+mkdirSync(resolve(USER_THEMES, 'compact'), { recursive: true });
+writeFileSync(resolve(USER_THEMES, 'compact', 'resume.tex'), `% compact custom theme — layout-check scenario
+\\documentclass[letterpaper,11pt]{article}
+\\usepackage[T1]{fontenc}
+\\usepackage[utf8]{inputenc}
+\\usepackage[margin=0.75in]{geometry}
+\\usepackage{enumitem}
+\\usepackage[hidelinks]{hyperref}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{2pt}
+\\setlist[itemize]{leftmargin=*, topsep=2pt, itemsep=1pt, label=\\textbullet}
+\\sloppy
+\\setlength{\\emergencystretch}{3em}
+\\tolerance=2000
+\\pagestyle{empty}
+\\raggedright
+\\begin{document}
+
+{{HEADER}}
+
+{{EXPERIENCE_SECTION}}
+{{EDUCATION_SECTION}}
+
+\\end{document}
+`);
+writeFileSync(resolve(USER_THEMES, 'compact', 'cover.tex'), `% compact custom cover theme
+\\documentclass[letterpaper,11pt]{article}
+\\usepackage[T1]{fontenc}
+\\usepackage[utf8]{inputenc}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{parskip}
+\\usepackage[hidelinks]{hyperref}
+\\setlength{\\parindent}{0pt}
+\\sloppy
+\\setlength{\\emergencystretch}{3em}
+\\pagestyle{empty}
+\\raggedright
+\\begin{document}
+{{HEADER}}
+
+\\vspace{1em}
+{{DATE}}
+
+\\vspace{1em}
+{{ADDRESS}}
+
+\\vspace{1em}
+{{GREETING}}
+
+{{BODY}}
+
+\\vspace{1em}
+{{SIGNATURE}}
+\\end{document}
+`);
+
 const scenarios = [
-  { name: 'short', cv: SHORT_CV, cover: SHORT_COVER, maxResumePages: 2, maxCoverPages: 1 },
-  { name: 'long',  cv: LONG_CV,  cover: LONG_COVER,  maxResumePages: 3, maxCoverPages: 2 },
+  { name: 'short',         cv: SHORT_CV, cover: SHORT_COVER, theme: undefined, maxResumePages: 2, maxCoverPages: 1 },
+  { name: 'long',          cv: LONG_CV,  cover: LONG_COVER,  theme: undefined, maxResumePages: 3, maxCoverPages: 2 },
+  { name: 'custom-short',  cv: SHORT_CV, cover: SHORT_COVER, theme: 'compact', maxResumePages: 2, maxCoverPages: 1, skipPdf: true, skipDocx: true },
+  { name: 'custom-long',   cv: LONG_CV,  cover: LONG_COVER,  theme: 'compact', maxResumePages: 2, maxCoverPages: 1, skipPdf: true, skipDocx: true },
 ];
 
 // ── Boot the env: write cv.md and profile.yml, init the DB ────────────────
@@ -189,16 +253,23 @@ function pdfPageCount(buf) {
 }
 
 async function runScenario(s) {
-  console.log(`\n=== Scenario: ${s.name.toUpperCase()} ===`);
+  console.log(`\n=== Scenario: ${s.name.toUpperCase()}${s.theme ? `  (theme="${s.theme}")` : ''} ===`);
   await setup(s.cv);
+
+  // When the scenario uses a custom theme, expose the user themes dir to the
+  // loader. Otherwise unset so the bundled default is in play.
+  if (s.theme) process.env.MCP_JSA_TEMPLATE_DIR = USER_THEMES;
+  else delete process.env.MCP_JSA_TEMPLATE_DIR;
 
   // Reset DB modules so a stale connection doesn't point at the previous DB instance.
   // Also clear the cached active-packet so the new cv.md drives parseCV().
   const { upsertJob }       = await import(resolve(REPO, 'dist/core/jobs.js'));
   const { parseCV }         = await import(resolve(REPO, 'dist/core/cv_parse.js'));
-  const { buildResumeTex, buildCoverTex } = await import(resolve(REPO, 'dist/core/render_tex.js'));
-  const { buildResumeDocx, buildCoverDocx } = await import(resolve(REPO, 'dist/core/render_docx.js'));
-  const { renderPdf } = await import(resolve(REPO, 'dist/core/render.js'));
+  // Cache-bust the renderer modules so they pick up the changed env vars.
+  const cb = '?cb=' + Math.random();
+  const { buildResumeTex, buildCoverTex } = await import(resolve(REPO, 'dist/core/render_tex.js') + cb);
+  const { buildResumeDocx, buildCoverDocx } = await import(resolve(REPO, 'dist/core/render_docx.js') + cb);
+  const { renderPdf } = await import(resolve(REPO, 'dist/core/render.js') + cb);
 
   // Seed a job row so renderPdf has something to attach to.
   const j = await upsertJob({ source: 'test', source_url: 'test://' + s.name, company_name: 'Pinch AI', title: 'Builder PM' });
@@ -210,19 +281,22 @@ async function runScenario(s) {
   note(cv.skills.length    >= 1 ? 'PASS' : 'FAIL', `${s.name}: parseCV picks up ${cv.skills.length} skill categories`);
 
   // ── PDF (HTML→Chromium) ────────────────────────────────────────────────
-  const pdfFiles = await renderPdf({ job_id: jobId, kind: 'both', cover_body: s.cover, page_format: 'letter' });
-  for (const f of pdfFiles) {
-    const buf = readFileSync(resolve(process.env.MCP_JSA_OUTPUT_DIR, f.path));
-    const pages = pdfPageCount(buf);
-    const max = f.kind === 'resume' ? s.maxResumePages : s.maxCoverPages;
-    note(pages > 0 && pages <= max ? 'PASS' : 'FAIL',
-         `${s.name}: ${f.kind}.pdf page count = ${pages} (≤ ${max} expected)`,
-         f.path);
+  // Skip when a custom theme only ships .tex (no resume.html / cover.html).
+  if (!s.skipPdf) {
+    const pdfFiles = await renderPdf({ job_id: jobId, kind: 'both', cover_body: s.cover, page_format: 'letter', theme: s.theme });
+    for (const f of pdfFiles) {
+      const buf = readFileSync(resolve(process.env.MCP_JSA_OUTPUT_DIR, f.path));
+      const pages = pdfPageCount(buf);
+      const max = f.kind === 'resume' ? s.maxResumePages : s.maxCoverPages;
+      note(pages > 0 && pages <= max ? 'PASS' : 'FAIL',
+           `${s.name}: ${f.kind}.pdf page count = ${pages} (≤ ${max} expected)`,
+           f.path);
+    }
   }
 
   // ── .tex ──────────────────────────────────────────────────────────────
-  const texResume = buildResumeTex();
-  const texCover  = buildCoverTex({ body: s.cover, company: 'Pinch AI', location: 'Remote' });
+  const texResume = buildResumeTex({ theme: s.theme });
+  const texCover  = buildCoverTex({ body: s.cover, company: 'Pinch AI', location: 'Remote' }, { theme: s.theme });
   const texDir = resolve(process.env.MCP_JSA_OUTPUT_DIR, 'tex');
   mkdirSync(texDir, { recursive: true });
   const texResumePath = resolve(texDir, `resume-${s.name}.tex`);
@@ -254,6 +328,7 @@ async function runScenario(s) {
   }
 
   // ── .docx ─────────────────────────────────────────────────────────────
+  if (s.skipDocx) return;
   const docxDir = resolve(process.env.MCP_JSA_OUTPUT_DIR, 'docx');
   mkdirSync(docxDir, { recursive: true });
   const docxResume = resolve(docxDir, `resume-${s.name}.docx`);

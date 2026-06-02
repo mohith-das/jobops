@@ -157,6 +157,8 @@ roles where sponsorship is a non-issue — turn it off; the rest of the system w
 | `MCP_JSA_DATA_DIR` | `<install>/data` | SQLite + WAL location |
 | `MCP_JSA_OUTPUT_DIR` | `<install>/output` | Rendered artifacts (PDFs, report HTML) |
 | `MCP_JSA_VISA_SCORING` | `true` | Set `false` to drop visa surface entirely (see above) |
+| `MCP_JSA_TEMPLATE_DIR` | _empty_ | User-owned dir holding additional resume/cover themes — overrides bundled themes of the same name. See [Custom themes](#custom-themes) + [`TEMPLATES.md`](./TEMPLATES.md). |
+| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` argument. |
 | `MCP_JSA_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
 | `MCP_JSA_LLM_PROVIDER` | `gemini` | Used only by `api`/batch paths: `gemini`, `deepseek`, `none` |
 | `MCP_JSA_LLM_MODEL` | _empty_ | Provider-specific model id |
@@ -356,6 +358,52 @@ one format merges into the existing map — never clobbers the others.
 The `.tex` and `.docx` are built from the same parsed `cv.md` and `cover_body` the
 PDF uses, so editing and recompiling the `.tex` reproduces the same document. The
 visa-leakage rail runs against every output format before files are written.
+
+### Custom themes
+
+`render_pdf` accepts a `template` argument — pick a named theme to render with.
+Themes are directories under `templates/themes/<name>/` holding any of:
+
+```
+resume.tex    cover.tex    resume.html    cover.html
+```
+
+Out of the box you get `default`. To author your own:
+
+```bash
+mkdir -p ~/job-themes/compact
+# Author resume.tex / cover.tex / resume.html / cover.html in there.
+# Each theme file is a plain template with {{PLACEHOLDER}} slots — see
+# TEMPLATES.md for the full placeholder contract.
+
+export MCP_JSA_TEMPLATE_DIR=~/job-themes
+npx job_ops-mcp templates             # lists bundled + user themes
+
+# Then in your MCP chat:
+# render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact" cover_body="..."
+```
+
+The loader checks `$MCP_JSA_TEMPLATE_DIR` **first**, so a `default/` directory
+inside your themes dir overrides the bundled default. Set `MCP_JSA_DEFAULT_TEMPLATE`
+to make a non-`default` theme the implicit default for every call.
+
+| Env var | Default | What it does |
+|---------|---------|--------------|
+| `MCP_JSA_TEMPLATE_DIR` | _empty_ | Extra dir holding your custom themes (one subdir per theme). |
+| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` arg. |
+
+A custom theme that omits a placeholder degrades gracefully (the section is dropped,
+the renderer does not crash). A malformed theme (missing `\documentclass`, missing
+`\begin{document}`, etc.) returns a clear error naming the theme + file — pdflatex's
+own backtrace never reaches the user. The visa-leakage scan and ATS hard rules apply
+regardless of which theme you pick.
+
+See [`TEMPLATES.md`](./TEMPLATES.md) for the full placeholder reference + an example
+custom theme.
+
+> `.docx` is generated programmatically and does **not** use themes. The Word file
+> follows a fixed Calibri / heading-style layout for ATS friendliness; edit the
+> output in Word if you need visual variation.
 
 ---
 

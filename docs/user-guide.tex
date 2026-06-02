@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.5.1} \\
+\textsf{\small\bfseries Version} & \texttt{0.6.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -1200,6 +1200,34 @@ Edit \fpath{modes/rubric.md}. Change the weights paragraph and the formula. Next
 If you change weights mid-search, your existing \texttt{score\_total} values reflect the old formula. \tool{batch\_evaluate} will re-rate any job whose \texttt{score\_total} is NULL \textemdash{} set the column to NULL for everything you want re-scored.
 \end{tipbox}
 
+\subsection*{Custom resume / cover themes}\label{sec:themes}
+
+\tool{render\_pdf} accepts a \texttt{template} argument so you can swap the bundled default for a theme you author. A theme is a directory under \fpath{templates/themes/<name>/} that holds any of \fpath{resume.tex}, \fpath{cover.tex}, \fpath{resume.html}, \fpath{cover.html}; each file is a plain template with \texttt{\{\{PLACEHOLDER\}\}} slots the renderer fills with the same tailored content it uses for the default theme. See \fpath{TEMPLATES.md} in the repo root for the full placeholder reference.
+
+To author a custom theme:
+
+\begin{lstlisting}[language=bashplus]
+mkdir -p ~/job-themes/compact
+# Author resume.tex / cover.tex / resume.html / cover.html -- copy the
+# bundled default as a starting point and edit the preamble or layout.
+
+export MCP_JSA_TEMPLATE_DIR=~/job-themes
+npx job_ops-mcp templates             # lists bundled + user themes
+
+# Then in your MCP chat, pass template= to render_pdf:
+#   render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact"
+\end{lstlisting}
+
+The loader checks \texttt{\$MCP\_JSA\_TEMPLATE\_DIR} first, so a \fpath{default/} directory in your themes dir overrides the bundled default. To make a custom theme the implicit default for every \tool{render\_pdf} call (instead of passing \texttt{template=...}):
+
+\begin{lstlisting}[language=bashplus]
+export MCP_JSA_DEFAULT_TEMPLATE=compact
+\end{lstlisting}
+
+Hard rules still apply regardless of theme: the visa-leakage scan runs on \texttt{cover\_body} \emph{before} substitution, so a custom template cannot inject visa/work-auth language. A theme that omits a placeholder silently drops that section (graceful degradation). A theme missing \verb|\documentclass| or \verb|\begin{document}| produces an error that quotes the theme name + file path \textemdash{} pdflatex's own backtrace never reaches the user.
+
+\fpath{.docx} is generated programmatically and does not use themes. If you need visual variation for \fpath{.docx}, edit the output in Word.
+
 % ═════════════════════════════════════════════════════════════════════════════
 \section{The hard rules (safety model)}
 
@@ -1313,7 +1341,7 @@ If you find yourself \textbf{tweaking the rubric instead of clicking send}, the 
 \vfill
 \begin{flushright}
 \small\color{black!50}\sffamily
-job\_ops-mcp \textbullet{} v0.5.1 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
+job\_ops-mcp \textbullet{} v0.6.0 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
 \end{flushright}
 
 \end{document}

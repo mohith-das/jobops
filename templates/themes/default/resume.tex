@@ -1,0 +1,49 @@
+% job_ops-mcp default resume theme. See TEMPLATES.md for the placeholder
+% contract a custom theme must satisfy. Compile with: pdflatex resume.tex
+\documentclass[letterpaper,11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.7in,top=0.65in,bottom=0.65in]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{accent}{HTML}{145374}
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{accent}}
+  {}{0pt}{}[\vspace{-6pt}\titlerule\vspace{2pt}]
+\titlespacing*{\section}{0pt}{10pt}{4pt}
+
+\setlist[itemize]{
+  leftmargin=*,
+  topsep=2pt,
+  partopsep=0pt,
+  parsep=1pt,
+  itemsep=2pt,
+  label=\textbullet,
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+
+\sloppy
+\setlength{\emergencystretch}{3em}
+\tolerance=2000
+
+\pagestyle{empty}
+\raggedright
+
+\begin{document}
+
+{{HEADER}}
+
+{{SUMMARY_SECTION}}
+{{SKILLS_SECTION}}
+{{EXPERIENCE_SECTION}}
+{{PROJECTS_SECTION}}
+{{EDUCATION_SECTION}}
+{{CERTIFICATIONS_SECTION}}
+
+\end{document}

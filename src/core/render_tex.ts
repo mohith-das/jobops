@@ -1,17 +1,16 @@
 // LaTeX source generator for resume + cover letter.
 //
-// Builds self-contained .tex from the parsed CV (CVData from cv_parse.ts). The output:
-//   - Compiles with vanilla `pdflatex` on any TeX Live install (no fontspec, no
-//     charter, no minted, no exotic packages).
-//   - Uses Computer Modern Roman — ubiquitous, ATS-clean, prints to letter paper.
-//   - Tight but generous spacing tuned to stay within a 1-letter page for typical
-//     content AND to handle long content without producing overfull \hbox warnings.
-//   - Real \section / \begin{itemize} structure — no images, no text boxes.
+// Builds self-contained .tex from the parsed CV (CVData from cv_parse.ts) by
+// rendering each section block to a LaTeX string, then substituting those blocks
+// into a chosen theme template (see core/templates.ts). The default theme keeps
+// the original Computer-Modern, ATS-clean look — compatible with vanilla
+// pdflatex on any TeX Live install (no fontspec, no minted, no exotic packages).
 //
-// scanForVisaLeakage() must be called on the returned string by the caller before
-// writing to disk; the rail applies to every output format, not just the PDF.
+// scanForVisaLeakage() must be called on the returned string by the caller
+// before writing to disk; the rail applies to every output format.
 
 import { parseCV, type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
+import { loadTemplate, fillTemplate, effectiveDefaultTemplate } from './templates.js';
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -24,99 +23,50 @@ export interface CoverFields {
   location: string;
 }
 
-/** Build the resume .tex from cv.md + profile.yml. */
-export function buildResumeTex(): string {
-  const cv = parseCV();
-  return resumeDocument(cv);
+/** Build the resume .tex. `theme` defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+export function buildResumeTex(opts: { theme?: string } = {}): string {
+  const theme = opts.theme ?? effectiveDefaultTemplate();
+  try {
+    const cv  = parseCV();
+    const tpl = loadTemplate(theme, 'resume.tex');
+    return fillTemplate(tpl.body, resumeValues(cv));
+  } catch (err: any) {
+    // Wrap any downstream error with the theme name so it isn't cryptic.
+    throw new Error(`render_tex (theme="${theme}"): ${err?.message ?? err}`);
+  }
 }
 
-/** Build the cover letter .tex. Uses identity from cv.md + the prose body. */
-export function buildCoverTex(args: CoverFields): string {
-  const cv = parseCV();
-  return coverDocument(cv, args);
+/** Build the cover .tex. `theme` defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+export function buildCoverTex(args: CoverFields, opts: { theme?: string } = {}): string {
+  const theme = opts.theme ?? effectiveDefaultTemplate();
+  try {
+    const cv  = parseCV();
+    const tpl = loadTemplate(theme, 'cover.tex');
+    return fillTemplate(tpl.body, coverValues(cv, args));
+  } catch (err: any) {
+    throw new Error(`render_tex cover (theme="${theme}"): ${err?.message ?? err}`);
+  }
 }
 
-// ── Resume document ─────────────────────────────────────────────────────────
+// ── Placeholder values: resume ──────────────────────────────────────────────
 
-function resumeDocument(cv: CVData): string {
-  const lines: string[] = [];
-  lines.push(PREAMBLE_RESUME);
-  lines.push('\\begin{document}');
-  lines.push('');
-  lines.push(header(cv));
-  lines.push('');
-
-  if (cv.summary?.trim()) {
-    lines.push('\\section*{Summary}');
-    lines.push(escapeLatex(cv.summary.trim()));
-    lines.push('');
-  }
-  if (cv.skills?.length) {
-    lines.push('\\section*{Skills}');
-    lines.push(skillsSection(cv.skills));
-    lines.push('');
-  }
-  if (cv.experiences?.length) {
-    lines.push('\\section*{Experience}');
-    for (const e of cv.experiences) lines.push(experienceBlock(e));
-    lines.push('');
-  }
-  if (cv.projects?.length) {
-    lines.push('\\section*{Projects}');
-    for (const p of cv.projects) lines.push(projectBlock(p));
-    lines.push('');
-  }
-  if (cv.education?.length) {
-    lines.push('\\section*{Education}');
-    for (const e of cv.education) lines.push(educationBlock(e));
-    lines.push('');
-  }
-
-  lines.push('\\end{document}');
-  return lines.join('\n');
+function resumeValues(cv: CVData): Record<string, string> {
+  return {
+    HEADER:                  header(cv),
+    SUMMARY_SECTION:         section('Summary',         cv.summary?.trim() ? escapeLatex(cv.summary.trim()) : ''),
+    SKILLS_SECTION:          section('Skills',          cv.skills?.length ? skillsSection(cv.skills) : ''),
+    EXPERIENCE_SECTION:      section('Experience',      cv.experiences?.length ? cv.experiences.map(experienceBlock).join('\n') : ''),
+    PROJECTS_SECTION:        section('Projects',        cv.projects?.length ? cv.projects.map(projectBlock).join('\n') : ''),
+    EDUCATION_SECTION:       section('Education',       cv.education?.length ? cv.education.map(educationBlock).join('\n') : ''),
+    CERTIFICATIONS_SECTION:  '',  // not surfaced from cv.md/profile.yml at this layer; user templates can hard-code or skip
+  };
 }
 
-const PREAMBLE_RESUME = String.raw`% Auto-generated by job_ops-mcp. Pure pdflatex --- no fontspec, no exotic packages.
-% Compile with: pdflatex resume.tex
-\documentclass[letterpaper,11pt]{article}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[margin=0.7in,top=0.65in,bottom=0.65in]{geometry}
-\usepackage{enumitem}
-\usepackage{xcolor}
-\usepackage{titlesec}
-\usepackage[hidelinks]{hyperref}
-
-\definecolor{accent}{HTML}{145374}
-
-% Tight, ATS-clean sections. Section title is sans-bold-uppercase with an accent rule.
-\titleformat{\section}
-  {\normalfont\large\bfseries\color{accent}}
-  {}{0pt}{}[\vspace{-6pt}\titlerule\vspace{2pt}]
-\titlespacing*{\section}{0pt}{10pt}{4pt}
-
-% Tight lists: minimal vertical waste so a real resume fits without overfull boxes.
-\setlist[itemize]{
-  leftmargin=*,
-  topsep=2pt,
-  partopsep=0pt,
-  parsep=1pt,
-  itemsep=2pt,
-  label=\textbullet,
+/** Produce \section*{title}\n<body> or empty if body is empty. */
+function section(title: string, body: string): string {
+  if (!body) return '';
+  return `\\section*{${title}}\n${body}\n`;
 }
-
-% No paragraph indent; sober paragraph spacing.
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{2pt}
-
-% Generous line-breaking budget so long bullets stretch instead of overflowing.
-\sloppy
-\setlength{\emergencystretch}{3em}
-\tolerance=2000
-
-\pagestyle{empty}
-\raggedright
-`;
 
 function header(cv: CVData): string {
   const contact: string[] = [];
@@ -167,9 +117,9 @@ function educationBlock(e: EducationItem): string {
   return `\\textbf{${escapeLatex(e.title)}}${org}${year}${desc}\\\\[2pt]`;
 }
 
-// ── Cover letter document ───────────────────────────────────────────────────
+// ── Placeholder values: cover ───────────────────────────────────────────────
 
-function coverDocument(cv: CVData, args: CoverFields): string {
+function coverValues(cv: CVData, args: CoverFields): Record<string, string> {
   const paras = args.body
     .split(/\n{2,}/)
     .map(p => p.trim())
@@ -184,47 +134,27 @@ function coverDocument(cv: CVData, args: CoverFields): string {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const companyLine = [args.company, args.location].filter(Boolean).join(', ');
 
-  return [
-    PREAMBLE_COVER,
-    '\\begin{document}',
-    '',
-    `{\\large\\bfseries ${escapeLatex(cv.name || 'Candidate')}}\\\\`,
-    `{\\small ${contact.join(' \\quad ')}}`,
-    '',
-    `\\vspace{1.2em}`,
-    escapeLatex(today),
-    '',
-    `\\vspace{1em}`,
-    'Hiring Team\\\\',
-    escapeLatex(companyLine || args.company || 'Hiring Team'),
-    '',
-    '\\vspace{1em}',
-    'Dear Hiring Manager,',
-    '',
-    ...paras.map(p => `${p}\n`),
-    '\\vspace{1em}',
-    'Best regards,\\\\',
-    escapeLatex(cv.name || 'Candidate'),
-    '',
-    '\\end{document}',
-  ].join('\n');
-}
+  // HEADER: name + contact line
+  const headerLines: string[] = [];
+  headerLines.push(`{\\large\\bfseries ${escapeLatex(cv.name || 'Candidate')}}\\\\`);
+  if (contact.length) headerLines.push(`{\\small ${contact.join(' \\quad ')}}`);
 
-const PREAMBLE_COVER = String.raw`% Auto-generated cover letter by job_ops-mcp. Compile with: pdflatex cover.tex
-\documentclass[letterpaper,11pt]{article}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[margin=1in]{geometry}
-\usepackage{parskip}
-\usepackage[hidelinks]{hyperref}
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{0.6em}
-\sloppy
-\setlength{\emergencystretch}{3em}
-\tolerance=2000
-\pagestyle{empty}
-\raggedright
-`;
+  // ADDRESS: "Hiring Team\\Company, Location"
+  const addressLines: string[] = ['Hiring Team\\\\'];
+  addressLines.push(escapeLatex(companyLine || args.company || 'Hiring Team'));
+
+  // SIGNATURE: "Best regards,\\Name"
+  const signature = `Best regards,\\\\\n${escapeLatex(cv.name || 'Candidate')}`;
+
+  return {
+    HEADER:    headerLines.join('\n'),
+    DATE:      escapeLatex(today),
+    ADDRESS:   addressLines.join('\n'),
+    GREETING:  'Dear Hiring Manager,',
+    BODY:      paras.join('\n\n'),
+    SIGNATURE: signature,
+  };
+}
 
 // ── LaTeX escaping ──────────────────────────────────────────────────────────
 
@@ -246,7 +176,6 @@ const SPECIAL_RE = /[\\&%$#_{}~^]/g;
 /** Escape every LaTeX special. Order matters: \ must be first or it double-escapes. */
 export function escapeLatex(s: string | null | undefined): string {
   if (s == null) return '';
-  // First pass: escape backslashes via a sentinel so the regex below doesn't see them.
   return String(s).replace(SPECIAL_RE, ch => LATEX_SPECIALS[ch] ?? ch);
 }
 

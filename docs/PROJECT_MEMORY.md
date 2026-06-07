@@ -7,13 +7,13 @@
 > generic and public-repo-safe.
 >
 > Repo: https://github.com/mohith-das/job_ops-mcp · npm: `job_ops-mcp` · License: MIT
-> Current line: **0.8.x**. Run `npm view job_ops-mcp version` for the latest.
+> Current line: **0.9.x**. Run `npm view job_ops-mcp version` for the latest.
 
 ---
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **38 tools** + **6
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **39 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -80,13 +80,18 @@ keep history). It is rebuilt ("reseeded") from:
 - `cv.md` (parsed) → Sections 3–8 (experience bullets, projects, skills, education)
 - `modes/career_packet.md` → the template wrapper + Section 9 hard rules (preserved across reseeds)
 
-> **The DB is runtime state; `cv.md` / `config/profile.yml` are the source of truth.**
-> Edit the **source files** and run **reseed** — do NOT hand-edit the packet in the DB. (See
-> §12 Drift trap.)
+Each row records an `origin`: `seed` / `reseed` (built from the source files) or
+`chat_edit` (written via `update_career_packet`). This makes editing safe from **both**
+directions (see §12):
+> **Two safe edit directions, neither destructive.** Edit from chat
+> (`update_career_packet`) — the packet is marked `chat_edit` and a plain `reseed` then
+> **refuses** to overwrite it (pass `force` to override). Or edit the source files and
+> `reseed`. To reconcile, `sync_packet_to_cv` writes the packet back into `cv.md` +
+> `profile.yml`. `reseed` = cv.md → packet; `sync_packet_to_cv` = packet → cv.md.
 
 ---
 
-## 3. The 38 tools (grouped)
+## 3. The 39 tools (grouped)
 
 Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
 
@@ -135,10 +140,18 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 - `daily_digest` — a morning summary of new high-scoring jobs + due follow-ups.
 
 **Profile + ops**
-- `get_career_packet` — read the active packet.
-- `update_career_packet` — write a new packet version (advanced; prefer reseed from sources).
-- `reseed_career_packet` — rebuild the active packet from `cv.md` + `profile.yml` (the
-  normal way to apply CV/profile edits).
+- `get_career_packet` — read the active packet (markdown + version + origin).
+- `update_career_packet` — **edit the packet from chat** and persist a new version. Two
+  modes: full replace (`content`) or ergonomic **section edit** (`section` + `section_content`,
+  e.g. section "2" for taglines, "6" for projects — no need to re-send the whole packet).
+  Marks the packet **user-edited** so a later reseed won't silently overwrite it.
+- `reseed_career_packet` — rebuild the active packet from `cv.md` + `profile.yml`. **Safe by
+  default:** refuses (warns) if the packet has chat edits not in cv.md; pass `force:true` to
+  rebuild anyway.
+- `sync_packet_to_cv` — **inverse of reseed:** write the active packet back into `cv.md`
+  (Sections 3–8) + `profile.yml` (taglines/identity) so the source files catch up to chat
+  edits and a later reseed reproduces them. Optional `then_reseed:true` to rebuild + reconcile
+  in one step.
 - `update_profile` — capture identity fields + taglines via elicitation (or `fields={...}`),
   write `profile.yml`, and reseed in one step (see §8).
 - `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as
@@ -392,22 +405,29 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
 
 ---
 
-## 12. The drift trap (read this before hand-editing anything)
+## 12. Two edit directions (drift is now guarded, not a trap)
 
 The DB `career_packet` is **runtime state**; `cv.md` + `config/profile.yml` (+ the
-`modes/career_packet.md` template) are the **source of truth**.
+`modes/career_packet.md` template) are the **file source of truth**. You can edit from
+either side, and the server stops one from silently destroying the other:
 
-If you hand-edit the active packet directly (e.g. via `update_career_packet`) instead of the
-source files, your edits live **only in the DB**. The next `reseed` rebuilds Sections 1–8
-from the source files and **silently drops** your DB-only edits — so people re-stamp the same
-edits after every reseed. That is "drift."
+**Chat-driven (the packet is your edit surface).** `update_career_packet` writes a new
+version marked `origin=chat_edit`. A plain `reseed` then **refuses** to rebuild over it —
+it warns and asks for `force:true`, so accumulated chat edits are never silently wiped.
+`doctor` reports this state as "chat-edited (ahead of cv.md) — expected," not a nag. Use
+section edits (`section`+`section_content`) for surgical changes like "change my tagline."
 
-**Always edit at the source, then reseed:**
+**File-driven (cv.md / profile.yml are the source).** Edit the files, then `reseed`:
 - Identity, naming, links, **taglines** → `config/profile.yml` (taglines auto-fill Section 2).
 - Experience bullets, projects, skills, education → `cv.md`.
-- Standing policy that isn't a CV/profile field (e.g. name-rendering convention, a LaTeX
-  escaping rule, custom hard rules) → `modes/career_packet.md` **Section 9** (and the
-  preamble) — reseed preserves those; it only regenerates Sections 1–8.
-- Then run `reseed_career_packet` (or `npx job_ops-mcp reseed`).
+- Standing policy that isn't a CV/profile field (name-rendering convention, LaTeX escaping
+  rule, custom hard rules) → `modes/career_packet.md` **Section 9** + preamble (reseed
+  preserves those; it only regenerates Sections 1–8).
 
-Rule of thumb: if a `reseed` would erase your change, you edited the wrong place.
+**Reconcile the two.** `sync_packet_to_cv` writes the active packet back into `cv.md` +
+`profile.yml` so the files catch up to chat edits — then a `reseed --force` reproduces the
+packet instead of clobbering it. Symmetric: `reseed` = cv.md → packet; `sync_packet_to_cv`
+= packet → cv.md. Both explicit; neither automatic.
+
+Rule of thumb: chat edits are safe and durable; `reseed` only overwrites them if you pass
+`force`. If you want the files to own the content, edit them and `reseed` (or sync-back first).

@@ -54,6 +54,7 @@ import {
   getCareerPacketTool, updateCareerPacketTool, enrichCompanyTool, costEstimateTool,
 } from './tools/ops.js';
 import { reseedCareerPacketTool } from './tools/reseed.js';
+import { syncPacketToCvTool } from './tools/sync_packet.js';
 import { updateProfileTool } from './tools/profile_elicit.js';
 
 // G8 — apply prefill
@@ -77,7 +78,7 @@ const FULL_TOOLSET: AnyToolDef[] = [
   extractStoriesTool, getStoryBankTool, negotiationBriefTool,
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
-  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, updateProfileTool, enrichCompanyTool, costEstimateTool,
+  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, syncPacketToCvTool, updateProfileTool, enrichCompanyTool, costEstimateTool,
   applyPrefillTool,
   schedulerStatusTool, schedulerEnableTool, schedulerDisableTool,
 ];

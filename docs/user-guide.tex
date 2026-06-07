@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.8.1} \\
+\textsf{\small\bfseries Version} & \texttt{0.9.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 38 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 39 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 38 tools.
+One process. Three planes. Six MCP resources and 39 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -361,27 +361,26 @@ npx job_ops-mcp start
 The CLI is also published as the dual alias \cmd{npx job-ops-mcp} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
 \end{tipbox}
 
-\begin{tipbox}[The edit-cv.md loop]
-Your \tool{career\_packet} is the source of truth the chat uses to score JDs and
-draft materials. It's built from \fpath{cv.md} + \fpath{config/profile.yml}. Whenever
-you edit \fpath{cv.md}, \textbf{re-run reseed} so the chat sees the new bullets.
-\cmd{reseed} writes a NEW active version (previous version demoted, history kept).
-The chat can also call the \tool{reseed\_career\_packet} MCP tool to do the same
-thing without leaving the conversation. \cmd{doctor} warns when \fpath{cv.md}
-changed since the last reseed.
+\begin{tipbox}[Editing the packet — two safe directions]
+The \tool{career\_packet} is the source of truth the chat uses to score JDs and draft
+materials. You can edit it from \textbf{either} side, and neither silently destroys the other:
+\begin{itemize}
+\item \textbf{Chat-driven} \textemdash{} ask the chat to change a tagline / remove a project / tighten a bullet; it calls \tool{update\_career\_packet}, which writes a new version and marks the packet \emph{user-edited}. Section edits (\texttt{section}+\texttt{section\_content}) avoid re-sending the whole packet.
+\item \textbf{File-driven} \textemdash{} edit \fpath{cv.md} / \fpath{config/profile.yml}, then \cmd{reseed}.
+\end{itemize}
+\cmd{reseed} writes a NEW active version (previous demoted, history kept). To reconcile, \tool{sync\_packet\_to\_cv} writes the packet back into \fpath{cv.md} + \fpath{config/profile.yml}. Symmetric: \cmd{reseed} = cv.md~$\rightarrow$~packet; \tool{sync\_packet\_to\_cv} = packet~$\rightarrow$~cv.md.
 \end{tipbox}
 
-\begin{warnbox}[Source of truth — avoid packet drift]
-The active packet in the DB is \emph{runtime state}; \fpath{cv.md} + \fpath{config/profile.yml}
-(+ \fpath{modes/career\_packet.md}) are the \emph{source of truth}. Edit the source files and
-reseed \textemdash{} do \textbf{not} hand-edit Sections 1--8 of the packet directly, because the
-next reseed regenerates them from the source files and silently drops DB-only edits (the
-classic ``drift'' trap). Identity / links / taglines $\rightarrow$ \fpath{config/profile.yml};
-experience / projects / skills / education $\rightarrow$ \fpath{cv.md}; standing policy with no
-CV/profile field (naming conventions, rendering rules, custom guardrails) $\rightarrow$
-\fpath{modes/career\_packet.md} Section 9, which reseed preserves. A single self-contained
-operator reference also ships at \fpath{docs/PROJECT\_MEMORY.md} \textemdash{} drop it into your
-MCP client's project memory.
+\begin{warnbox}[Reseed is non-destructive by default]
+If the active packet has chat edits (\tool{update\_career\_packet}, \texttt{origin=chat\_edit})
+that are not in \fpath{cv.md}, a plain \cmd{reseed} \textbf{refuses} and warns rather than
+overwriting them \textemdash{} pass \texttt{force} (\cmd{reseed -{}-force} / \texttt{force:true})
+to rebuild from \fpath{cv.md} anyway, or run \tool{sync\_packet\_to\_cv} first to write the edits
+back so a reseed \emph{reproduces} them. \cmd{doctor} reports a chat-edited packet as expected
+(``ahead of cv.md''), not a staleness nag. Standing policy with no CV/profile field (naming
+conventions, rendering rules, custom guardrails) lives in \fpath{modes/career\_packet.md}
+Section 9, which reseed always preserves. A self-contained operator reference ships at
+\fpath{docs/PROJECT\_MEMORY.md} \textemdash{} drop it into your MCP client's project memory.
 \end{warnbox}
 
 \subsection*{What \tool{init} creates}
@@ -466,7 +465,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 35--38 tools should appear in the tool picker.
+Restart Claude Desktop. The 36--39 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -724,7 +723,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-38 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+39 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 

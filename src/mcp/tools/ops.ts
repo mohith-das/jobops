@@ -3,12 +3,12 @@
 //   get_career_packet, update_career_packet, enrich_company, cost_estimate
 
 import { z } from 'zod';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { chatLogged, llmAvailable, COST_TABLE, estimateCostUsd } from '../../core/llm.js';
-import { getActiveCareerPacket } from '../../core/profile.js';
+import { getActiveCareerPacket, writeChatEditedPacket, editPacketSection } from '../../core/profile.js';
 import { getMode } from '../../core/modes.js';
 import { findCompanyByName } from '../../core/jobs.js';
 import { fileUrl, trackerUrl } from '../../core/links.js';
@@ -249,27 +249,59 @@ export const getCareerPacketTool = defineTool({
 
 export const updateCareerPacketTool = defineTool({
   name: 'update_career_packet',
-  title: 'Update the active career packet',
-  description: 'Replaces the active career packet content with a new version. Bumps version, retains history.',
+  title: 'Update the active career packet (chat is the edit surface)',
+  description:
+    'Edit the active career packet from chat and persist a NEW version (history retained). This is ' +
+    'the primary edit surface in chat-driven mode — the edit is marked user-edited so a later ' +
+    'reseed will NOT silently overwrite it (reseed then warns and requires force). ' +
+    'TWO modes: (a) full replace — pass `content`; (b) ergonomic SECTION edit — pass `section` ' +
+    '(e.g. "2" for taglines, "6" for projects) + `section_content` (just that section\'s new body), ' +
+    'so "change my tagline" or "remove project X" need not re-send the whole packet. ' +
+    'To bring cv.md up to date FROM these edits, use sync_packet_to_cv.',
   inputSchema: {
-    content: z.string().min(50).describe('Full markdown content of the new packet.'),
-    notes:   z.string().optional(),
+    content:         z.string().min(50).optional().describe('Full markdown content of the new packet (full-replace mode).'),
+    section:         z.string().optional().describe('Section number to edit, e.g. "2" (taglines) or "6" (projects). Use with section_content.'),
+    section_content: z.string().min(1).optional().describe('The new body for `section` (heading is kept). Replaces only that section.'),
+    notes:           z.string().optional(),
   },
   handler: async (args) => {
-    const id = randomUUID();
-    const result = await runInWriteLock(() => {
-      const db = getDb();
-      const lastV = (db.prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM career_packet`).get() as any).v as number;
-      const newV = lastV + 1;
-      db.prepare(`UPDATE career_packet SET is_active = 0 WHERE is_active = 1`).run();
-      const hash = createHash('sha256').update(args.content, 'utf-8').digest('hex');
-      db.prepare(`
-        INSERT INTO career_packet (id, version, content, is_active, source_cv_hash, notes)
-        VALUES (?, ?, ?, 1, ?, ?)
-      `).run(id, newV, args.content, hash, args.notes ?? null);
-      return { id, version: newV };
+    const hasFull    = typeof args.content === 'string';
+    const hasSection = typeof args.section === 'string' && typeof args.section_content === 'string';
+    if (hasFull && hasSection) {
+      return errResult('Pass EITHER `content` (full replace) OR `section`+`section_content` (section edit), not both.');
+    }
+    if (!hasFull && !hasSection) {
+      return errResult('Provide `content` (full replace) OR `section`+`section_content` (section edit). For a section edit, get_career_packet first to see section numbers.');
+    }
+
+    let newContent: string;
+    let notes = args.notes ?? null;
+    if (hasSection) {
+      const active = getActiveCareerPacket();
+      if (!active) return errResult('No active career_packet to edit. Run init/reseed first.');
+      try {
+        newContent = editPacketSection(active.content, args.section!, args.section_content!);
+      } catch (e: any) {
+        return errResult(e?.message ?? String(e));
+      }
+      if (newContent === active.content) {
+        return errResult(`Section ${args.section} body unchanged (or not matched) — nothing written.`);
+      }
+      notes = notes ?? `chat edit: section ${args.section!.replace(/[^0-9]/g, '')}`;
+    } else {
+      newContent = args.content!;
+    }
+
+    const result = await writeChatEditedPacket(newContent, notes);
+    return okResult({
+      id: result.id,
+      version: result.version,
+      content_bytes: result.bytes,
+      origin: 'chat_edit',
+      edited: hasSection ? `section ${args.section!.replace(/[^0-9]/g, '')}` : 'full',
+      note: 'Marked user-edited. reseed_career_packet will NOT overwrite this without force. '
+          + 'Use sync_packet_to_cv to update cv.md from this packet.',
     });
-    return okResult({ ...result, content_bytes: args.content.length });
   },
 });
 

@@ -129,6 +129,8 @@ async function cmdInit(flags: Map<string, string | boolean>) {
       console.log(`  ${c.dim('→ auto-reseeding now (previous active row demoted, version bumped, history kept)…')}`);
       const r = await seedCareerPacketFromFiles({ mode: 'reseed' });
       console.log(`  ${tick()} reseeded → v${r.version} (${r.sections_with_cv_content}/6 sections populated from cv.md)`);
+    } else if (status === 'packet_chat_edited') {
+      console.log(`  ${tick()} active packet is chat-edited (ahead of cv.md) — left intact. ${c.dim('reseed will not overwrite it without --force.')}`);
     } else if (status === 'cv_is_example') {
       console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx job_ops-mcp reseed')}.`);
     } else if (status === 'packet_is_template') {
@@ -327,6 +329,11 @@ async function cmdDoctor() {
       case 'no_packet':
         console.log(`  ${cross()} no active career_packet. Fix: ${fixInit}`);
         failures++;
+        break;
+      case 'packet_chat_edited':
+        console.log(`  ${tick()} career_packet v${active!.version} is ${c.bold('chat-edited')} (ahead of cv.md) — expected in chat-driven mode.`);
+        console.log(`         ${c.dim('reseed is safe: it will NOT overwrite these edits without force.')}`);
+        console.log(`         ${c.dim(`Want cv.md to be the source instead? Run the ${c.bold('sync_packet_to_cv')} tool to write edits back, or ${fixReseed} --force to rebuild from cv.md.`)}`);
         break;
       case 'no_cv':
         console.log(`  ${warn()} cv.md missing — packet is identity-only. Fix: create cv.md, then ${fixReseed}.`);
@@ -538,8 +545,17 @@ async function cmdReseed(flags: Map<string, string | boolean>) {
     process.exit(1);
   }
 
-  const r = await seedCareerPacketFromFiles({ mode: 'reseed' });
-  console.log(`  ${tick()} active career_packet → version ${c.bold(`v${r.version}`)} (${r.bytes} bytes)`);
+  const force = !!flags.get('force');
+  const r = await seedCareerPacketFromFiles({ mode: 'reseed', force });
+  if (r.blocked) {
+    console.error(`  ${warn()} ${c.bold('reseed refused — no changes made.')}`);
+    console.error(`  ${r.blocked_reason}`);
+    console.error('');
+    console.error(`  ${c.dim('→ Re-run with')} ${c.bold('--force')} ${c.dim('to rebuild from cv.md anyway (overwrites chat edits),')}`);
+    console.error(`  ${c.dim('  or run the')} ${c.bold('sync_packet_to_cv')} ${c.dim('tool first to write your edits back into cv.md.')}`);
+    process.exit(1);
+  }
+  console.log(`  ${tick()} active career_packet → version ${c.bold(`v${r.version}`)} (${r.bytes} bytes)${force ? c.dim(' [forced]') : ''}`);
   console.log(`  ${tick()} ${r.sections_with_cv_content}/6 sections populated from cv.md (sections 3-8)`);
   console.log('');
   console.log(c.dim('Preview (first ~400 chars):'));

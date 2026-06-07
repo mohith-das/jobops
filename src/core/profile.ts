@@ -159,16 +159,20 @@ export function cvHasRealContent(cvMd: string | null | undefined): boolean {
 export type PacketStatus =
   | 'ok'                        // packet matches the current cv.md
   | 'no_packet'                 // DB has no active row
+  | 'packet_chat_edited'        // active packet was edited via chat — intentionally ahead of cv.md
   | 'no_cv'                     // cv.md missing
   | 'cv_is_example'             // cv.md present but still the <…> example template
   | 'cv_edited_since_seed'      // cv.md hash differs from packet.source_cv_hash → reseed needed
   | 'packet_is_template';       // packet still has TODO markers in its body
 
 export function packetStatus(args: {
-  active: { content: string; source_cv_hash: string | null } | null;
+  active: { content: string; source_cv_hash: string | null; origin?: PacketOrigin } | null;
   cvMd:   string | null;
 }): PacketStatus {
   if (!args.active) return 'no_packet';
+  // Chat-edited packets are intentionally ahead of cv.md — that's the chat-driven workflow,
+  // NOT a staleness problem. This dominates the cv.md-hash check so doctor stops nagging.
+  if (args.active.origin === 'chat_edit') return 'packet_chat_edited';
   if (!args.cvMd)   return 'no_cv';
   if (!cvHasRealContent(args.cvMd)) return 'cv_is_example';
   // cv has real content — now check it matches what we built the packet from.
@@ -181,13 +185,19 @@ export function packetStatus(args: {
 
 // ── Active-packet accessor ──────────────────────────────────────────────────
 
+export type PacketOrigin = 'seed' | 'reseed' | 'chat_edit';
+
 export function getActiveCareerPacket(): {
-  id: string; version: number; content: string; source_cv_hash: string | null;
+  id: string; version: number; content: string; source_cv_hash: string | null; origin: PacketOrigin;
 } | null {
   const row = getDb()
-    .prepare(`SELECT id, version, content, source_cv_hash FROM career_packet WHERE is_active = 1`)
+    .prepare(`SELECT id, version, content, source_cv_hash, origin FROM career_packet WHERE is_active = 1`)
     .get() as any;
-  return row ?? null;
+  if (!row) return null;
+  // Defensive: a DB that predates migration 004 (shouldn't happen — migrations run on open)
+  // or a NULL would leave origin undefined; treat unknown as 'reseed'.
+  row.origin = (row.origin as PacketOrigin) ?? 'reseed';
+  return row;
 }
 
 // ── Seed / reseed ────────────────────────────────────────────────────────────
@@ -196,6 +206,13 @@ export interface SeedResult {
   version:        number;
   created:        boolean;            // true = wrote a new row, false = no change
   reused:         boolean;            // true when ensureActive saw existing row + force=false
+  /**
+   * true when reseed was REFUSED because the active packet is chat-edited and force was not
+   * set. The active packet is left untouched; nothing was written. The caller should surface
+   * `blocked_reason` and tell the user to pass force / sync-back first.
+   */
+  blocked:        boolean;
+  blocked_reason: string | null;
   bytes:          number;
   sections_with_cv_content: number;  // 0..6 — how many of S3-S8 got real cv.md content
   preview:        string;             // first ~400 chars for confirmation
@@ -206,10 +223,15 @@ export interface SeedResult {
  * modes/career_packet.md. Always writes a NEW row (bumps version, demotes previous)
  * unless `mode: 'ensure_active'` and an active row already exists.
  *
- *   mode='reseed'        — always writes a new version. The default.
+ *   mode='reseed'        — writes a new version. The default. SAFE by default: if the active
+ *                          packet was chat-edited (origin='chat_edit'), reseed is REFUSED
+ *                          (returns blocked) unless `force: true` — so cv.md→packet never
+ *                          silently destroys chat edits.
  *   mode='ensure_active' — only seeds if no active row exists (used by first-run boot).
  */
-export async function seedCareerPacketFromFiles(opts: { mode?: 'reseed' | 'ensure_active' } = {}): Promise<SeedResult> {
+export async function seedCareerPacketFromFiles(
+  opts: { mode?: 'reseed' | 'ensure_active'; force?: boolean } = {},
+): Promise<SeedResult> {
   const mode = opts.mode ?? 'reseed';
   const db = getDb();
 
@@ -218,29 +240,50 @@ export async function seedCareerPacketFromFiles(opts: { mode?: 'reseed' | 'ensur
       { version: number; content: string } | undefined;
     if (existing) {
       return {
-        version: existing.version, created: false, reused: true,
+        version: existing.version, created: false, reused: true, blocked: false, blocked_reason: null,
         bytes: existing.content.length, sections_with_cv_content: countSectionsWithCvContent(existing.content),
         preview: existing.content.slice(0, 400),
       };
     }
   }
 
+  // Non-destructive guard: never overwrite chat edits without an explicit force.
+  if (mode === 'reseed' && !opts.force) {
+    const active = getActiveCareerPacket();
+    if (active?.origin === 'chat_edit') {
+      return {
+        version: active.version, created: false, reused: false,
+        blocked: true,
+        blocked_reason:
+          `Active career_packet v${active.version} has chat edits (made via update_career_packet) ` +
+          `that are NOT in cv.md. Reseeding from cv.md would overwrite them. Re-run with force ` +
+          `to rebuild from cv.md anyway, or run sync_packet_to_cv first to write your edits back ` +
+          `into cv.md so a reseed reproduces them.`,
+        bytes: active.content.length,
+        sections_with_cv_content: countSectionsWithCvContent(active.content),
+        preview: active.content.slice(0, 400),
+      };
+    }
+  }
+
   const { content, sectionsWithContent, cvHash } = buildPacketContent();
   const id = randomUUID();
+  const origin: PacketOrigin = mode === 'ensure_active' ? 'seed' : 'reseed';
 
   const result = await runInWriteLock(() => {
     const lastV = (db.prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM career_packet`).get() as any).v as number;
     const newV = lastV + 1;
     db.prepare(`UPDATE career_packet SET is_active = 0 WHERE is_active = 1`).run();
     db.prepare(`
-      INSERT INTO career_packet (id, version, content, taglines, is_active, source_cv_hash, notes)
-      VALUES (?, ?, ?, NULL, 1, ?, ?)
-    `).run(id, newV, content, cvHash, mode === 'ensure_active' ? 'seeded on first run' : 'reseeded from cv.md + profile.yml');
+      INSERT INTO career_packet (id, version, content, taglines, is_active, source_cv_hash, notes, origin)
+      VALUES (?, ?, ?, NULL, 1, ?, ?, ?)
+    `).run(id, newV, content, cvHash,
+            origin === 'seed' ? 'seeded on first run' : 'reseeded from cv.md + profile.yml', origin);
     return { version: newV };
   });
 
   return {
-    version: result.version, created: true, reused: false,
+    version: result.version, created: true, reused: false, blocked: false, blocked_reason: null,
     bytes: content.length, sections_with_cv_content: sectionsWithContent,
     preview: content.slice(0, 400),
   };
@@ -250,6 +293,205 @@ export async function seedCareerPacketFromFiles(opts: { mode?: 'reseed' | 'ensur
 export async function ensureActiveCareerPacket(): Promise<{ version: number; created: boolean }> {
   const r = await seedCareerPacketFromFiles({ mode: 'ensure_active' });
   return { version: r.version, created: r.created };
+}
+
+// ── Chat edit (packet is the edit surface) ────────────────────────────────────
+
+/**
+ * Write a chat-edited packet as a NEW active version, marking origin='chat_edit' so a
+ * later reseed won't silently overwrite it. `source_cv_hash` is NULL — a chat edit is not
+ * derived from cv.md. History is retained (the previous active row is demoted, not deleted).
+ */
+export async function writeChatEditedPacket(
+  content: string, notes?: string | null,
+): Promise<{ id: string; version: number; bytes: number }> {
+  const db = getDb();
+  const id = randomUUID();
+  const result = await runInWriteLock(() => {
+    const lastV = (db.prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM career_packet`).get() as any).v as number;
+    const newV = lastV + 1;
+    db.prepare(`UPDATE career_packet SET is_active = 0 WHERE is_active = 1`).run();
+    db.prepare(`
+      INSERT INTO career_packet (id, version, content, taglines, is_active, source_cv_hash, notes, origin)
+      VALUES (?, ?, ?, NULL, 1, NULL, ?, 'chat_edit')
+    `).run(id, newV, content, notes ?? 'chat edit via update_career_packet');
+    return { version: newV };
+  });
+  return { id, version: result.version, bytes: content.length };
+}
+
+// ── Sync-back (packet → source files) ─────────────────────────────────────────
+
+export interface SyncBackResult {
+  cv_path:      string;
+  profile_path: string;
+  cv_bytes:     number;
+  roles:        number;
+  projects:     number;
+  skills:       number;
+  education:    number;
+  taglines:     number;
+  identity_fields: number;
+}
+
+/**
+ * Write the active packet's content back into the source files (`cv.md` + `config/profile.yml`)
+ * so a subsequent reseed reproduces it. The inverse of reseed — explicit and non-destructive
+ * to the packet (it only writes the source files; the active chat-edited packet stays active).
+ *
+ *   Sections 3–8 (experience / projects / skills / education) → cv.md (parseCV grammar)
+ *   Section 2 (taglines)                                       → profile.yml `taglines:` (replaced)
+ *   Section 1 (identity)                                       → profile.yml `candidate:` (merged)
+ *
+ * After this, `reseed_career_packet` (which is still blocked by the chat_edit guard) can be
+ * run with force to rebuild a reseed-origin packet from the now-synced cv.md.
+ */
+export function syncPacketToSourceFiles(): SyncBackResult {
+  const active = getActiveCareerPacket();
+  if (!active) throw new Error('No active career_packet to sync.');
+  const sections = splitNumberedSections(active.content);
+
+  // ── Build cv.md from Sections 3–8 ──
+  const { profile } = loadProjectFiles();
+  const name = (profile?.candidate?.full_name) || parseIdentity(sections.get('1.') ?? '').full_name || 'Candidate';
+  const headline = (profile?.narrative as any)?.headline as string | undefined;
+
+  const roleBlocks = ['3.', '4.', '5.'].flatMap(s => parseRoleBlocks(sections.get(s) ?? ''));
+  const projectLines = bulletLines(sections.get('6.') ?? '');
+  const skillLines   = bulletLines(sections.get('7.') ?? '');
+  // Education is re-emitted in cv.md grammar (`- **Title**, Org — Desc (Year)`) so parseCV
+  // captures the institution as `org`; the packet's render form (`— Org (Year). Desc`) would
+  // otherwise parse the org into an empty string.
+  const eduLines     = bulletLines(sections.get('8.') ?? '').map(packetEduToCvLine);
+
+  const parts: string[] = [`# CV — ${name}`];
+  if (profile?.candidate?.location) parts.push(`**Location:** ${profile.candidate.location}`);
+  if (profile?.candidate?.email)    parts.push(`**Email:** ${profile.candidate.email}`);
+  if (headline) parts.push(`\n## Professional Summary\n${headline}`);
+
+  if (roleBlocks.length) {
+    parts.push('\n## Work Experience\n');
+    for (const r of roleBlocks) {
+      parts.push(`### ${r.company} — ${r.role}`);
+      if (r.meta) parts.push(r.meta);
+      parts.push(...r.bullets.map(b => `- ${b}`));
+      parts.push('');
+    }
+  }
+  if (projectLines.length) parts.push('## Projects & Open Source\n\n' + projectLines.join('\n') + '\n');
+  if (eduLines.length)     parts.push('## Education\n\n' + eduLines.join('\n') + '\n');
+  if (skillLines.length)   parts.push('## Skills\n\n' + skillLines.join('\n') + '\n');
+
+  const cvMarkdown = parts.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  const cvPath = pathInProject('cv.md');
+  mkdirSync(dirname(cvPath), { recursive: true });
+  writeFileSync(cvPath, cvMarkdown, 'utf-8');
+
+  // ── Write Section 1 identity (merge) + Section 2 taglines (replace) → profile.yml ──
+  const profilePath = pathInProject('config', 'profile.yml');
+  const raw = readIfExists(profilePath);
+  const base: any = raw ? (yaml.load(raw) ?? {}) : {};
+
+  const identity = parseIdentity(sections.get('1.') ?? '');
+  let identityFields = 0;
+  if (Object.keys(identity).length) {
+    base.candidate = base.candidate ?? {};
+    for (const [k, v] of Object.entries(identity)) {
+      if (v && v.trim()) { base.candidate[k] = v.trim(); identityFields++; }
+    }
+  }
+
+  const taglineMap = parseTaglines(sections.get('2.') ?? '');
+  const taglineCount = Object.keys(taglineMap).length;
+  if (taglineCount) base.taglines = taglineMap;   // REPLACE so removed taglines don't resurrect on reseed
+
+  mkdirSync(dirname(profilePath), { recursive: true });
+  writeFileSync(profilePath, yaml.dump(base, { lineWidth: 100, noRefs: true }), 'utf-8');
+
+  return {
+    cv_path: cvPath, profile_path: profilePath, cv_bytes: cvMarkdown.length,
+    roles: roleBlocks.length, projects: projectLines.length, skills: skillLines.length,
+    education: eduLines.length, taglines: taglineCount, identity_fields: identityFields,
+  };
+}
+
+interface PacketRole { company: string; role: string; meta: string; bullets: string[]; }
+
+/** Parse renderRoleSection output (`**Company** — Role  \n_meta_\n\n- bullets`) back to items. */
+function parseRoleBlocks(body: string): PacketRole[] {
+  const lines = body.split('\n');
+  const roles: PacketRole[] = [];
+  let cur: PacketRole | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^\*\*(.+?)\*\*\s*[—–\-|]\s*(.+?)\s*$/);
+    if (h) {
+      if (cur) roles.push(cur);
+      const next = lines.slice(i + 1).find(l => l.trim() !== '') ?? '';
+      const mm = next.trim().match(/^_(.+)_$/);
+      cur = { company: h[1].trim(), role: h[2].trim(), meta: mm ? mm[1].trim() : '', bullets: [] };
+      continue;
+    }
+    if (cur && /^\s*-\s+/.test(lines[i])) cur.bullets.push(lines[i].replace(/^\s*-\s+/, '').trim());
+  }
+  if (cur) roles.push(cur);
+  return roles;
+}
+
+/** Keep only top-level markdown bullet lines (`- ...`), dropping indented continuations. */
+function bulletLines(body: string): string[] {
+  return body.split('\n').filter(l => /^- \S/.test(l)).map(l => l.replace(/\s+$/, ''));
+}
+
+/**
+ * Convert a packet education bullet (renderEducationBank form `- **Title** — Org (Year). Desc`)
+ * into cv.md grammar (`- **Title**, Org — Desc (Year)`) so parseCV's parseEducation captures
+ * Org/Year/Desc faithfully and a reseed reproduces the same rendered line. Lines that don't
+ * look like an education bullet pass through unchanged.
+ */
+function packetEduToCvLine(line: string): string {
+  const m = line.match(/^-\s+\*\*(.+?)\*\*\s*(.*)$/);
+  if (!m) return line;
+  const title = m[1].trim();
+  let rest = m[2].trim();
+  let org = '', year = '', desc = '';
+  const dash = rest.match(/^[—–-]\s*(.*)$/);   // leading "— Org…" (org present)
+  if (dash) rest = dash[1].trim();
+  const ym = rest.match(/\((\d{4}(?:[-–]\d{4})?)\)/);
+  if (ym) { year = ym[1]; rest = (rest.slice(0, ym.index) + rest.slice(ym.index! + ym[0].length)).trim(); }
+  const pm = rest.match(/^(.*?)\.\s+(.+)$/);   // "Org. Desc"
+  if (pm) { org = pm[1].trim(); desc = pm[2].trim(); }
+  else org = rest.replace(/[.\s]+$/, '').trim();
+  let out = `- **${title}**`;
+  if (org)  out += `, ${org}`;
+  if (desc) out += ` — ${desc}`;
+  if (year) out += ` (${year})`;
+  return out;
+}
+
+/** Parse a rendered Section 1 identity block (`- **Name:** X`) into candidate fields. */
+function parseIdentity(body: string): Record<string, string> {
+  const LABELS: Record<string, string> = {
+    name: 'full_name', email: 'email', phone: 'phone', location: 'location',
+    linkedin: 'linkedin', portfolio: 'portfolio_url', github: 'github', twitter: 'twitter',
+  };
+  const out: Record<string, string> = {};
+  for (const line of body.split('\n')) {
+    const m = line.match(/^-\s+\*\*([^:*]+):\*\*\s*(.+?)\s*$/);
+    if (!m) continue;
+    const key = LABELS[m[1].trim().toLowerCase()];
+    if (key && !(key in out)) out[key] = m[2].trim();   // first occurrence wins (resume-header name)
+  }
+  return out;
+}
+
+/** Parse a rendered Section 2 taglines block (`- **Archetype** — "tagline"`) into a map. */
+function parseTaglines(body: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of body.split('\n')) {
+    const m = line.match(/^-\s+\*\*(.+?)\*\*\s*[—–-]\s*"?(.+?)"?\s*$/);
+    if (m) out[m[1].trim()] = m[2].trim();
+  }
+  return out;
 }
 
 // ── Packet building ─────────────────────────────────────────────────────────
@@ -339,6 +581,24 @@ function replaceSectionBody(content: string, prefix: string, newBody: string): s
   const re = new RegExp(`(^## ${escaped}[^\\n]*\\n)([\\s\\S]*?)(?=^## |\\z)`, 'm');
   if (!re.test(content)) return content;        // section not in template — leave content alone
   return content.replace(re, (_match, heading) => `${heading}\n${newBody.trim()}\n\n`);
+}
+
+/**
+ * Replace ONE numbered section's body in a packet, for ergonomic chat edits ("change my
+ * tagline", "remove project X") without re-sending the whole packet. `section` accepts
+ * "2", "2.", or "## 2. Foo" forms. Throws if the section heading isn't present (so a typo'd
+ * section number fails loudly instead of silently no-op'ing).
+ */
+export function editPacketSection(packetContent: string, section: string, newBody: string): string {
+  const m = section.trim().match(/(\d+)/);
+  if (!m) throw new Error(`Invalid section "${section}" — expected a number like "2" or "6".`);
+  const prefix = `${m[1]}.`;
+  const headingRe = new RegExp(`^## ${prefix.replace('.', '\\.')}[^\\n]*$`, 'm');
+  if (!headingRe.test(packetContent)) {
+    const have = [...packetContent.matchAll(/^## (\d+)\./gm)].map(x => x[1]).join(', ');
+    throw new Error(`Section ${prefix} not found in the packet. Sections present: ${have || '(none)'}.`);
+  }
+  return replaceSectionBody(packetContent, prefix, newBody);
 }
 
 function splitNumberedSections(content: string): Map<string, string> {

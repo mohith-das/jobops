@@ -21,7 +21,7 @@ chat can reason against it directly without round-tripping through the DB.
 
 > **Note:** the headings below are a **template**. After `init` the server replaces
 > Section 1 (identity) from `config/profile.yml` and leaves the rest of the file as
-> editable scaffold. Replace `<TODO>` markers with bullets pulled from your own CV — keep
+> editable scaffold. Replace the TODO markers with bullets pulled from your own CV — keep
 > them concrete (verbs + metrics) and never list anything you can't defend in an interview.
 
 ---

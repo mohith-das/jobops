@@ -157,8 +157,10 @@ function parseExperiences(sections: Map<string, string>): ExperienceItem[] {
     if (h) {
       if (cur) out.push(cur);
       const [company, role] = splitCompanyRole(h[1]);
-      // Next non-empty line is usually "<period> · <location>"
-      const next = lines.slice(i + 1).find(l => l.trim() !== '') ?? '';
+      // Next non-empty NON-BULLET line is the "<period> · <location>" meta. Skipping
+      // bullets matters when a role has no meta line (e.g. a sync-back round-trip) — we
+      // must not consume the first bullet as the period.
+      const next = lines.slice(i + 1).find(l => l.trim() !== '' && !/^\s*-\s+/.test(l)) ?? '';
       const { period, location } = splitPeriodLocation(next);
       cur = { company, role, period, location, bullets: [] };
       continue;
@@ -227,7 +229,13 @@ function parseEducation(sections: Map<string, string>): EducationItem[] {
     const rest  = m[2].trim();
     const yearMatch = rest.match(/(\d{4}(?:[\-–]\d{4})?)/);
     const year = yearMatch ? yearMatch[1] : '';
-    const restNoYear = year ? rest.replace(year, '').trim() : rest;
+    // Remove the year, then clean up the empty parens it leaves behind ("(2020)" → "()"),
+    // and a leading separator dash so the org isn't captured as an empty string. Both make
+    // the packet ↔ cv.md round-trip (sync_packet_to_cv) preserve the institution.
+    let restNoYear = (year ? rest.replace(year, '') : rest)
+      .replace(/\(\s*\)/g, '')
+      .replace(/^\s*[—–-]\s*/, '')
+      .trim();
     const [org, ...descBits] = restNoYear.split('—').map(s => s.trim());
     items.push({ title, org: org ?? '', year, desc: descBits.join(' — ') });
   }

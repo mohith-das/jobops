@@ -42,29 +42,40 @@ npx job_ops-mcp connect
 That's the loop. Everything else (warm-intro finder, story bank, negotiation brief,
 batch rater, scheduler, …) is wired in but optional.
 
-### The edit-cv.md loop
+### Editing the career packet — two safe directions
 
-Your `career_packet` is the source of truth the chat uses to score JDs and draft
-materials. It's built from `cv.md` + `config/profile.yml`. Whenever you edit `cv.md`,
-**re-run reseed** so the chat sees the new bullets:
+Your `career_packet` is the source of truth the chat uses to score JDs and draft materials.
+You can drive edits from **either** direction, and **neither one silently destroys the
+other** — both are explicit:
 
-```bash
-# After any edit to cv.md:
-npx job_ops-mcp reseed
+**1. Chat-driven (the packet is your edit surface).** Ask the chat to change a tagline,
+remove a project, tighten a bullet — it calls `update_career_packet`, which writes a new
+version and **marks the packet user-edited**. From then on a plain `reseed` will **refuse**
+to overwrite it (it warns and tells you to pass `force` or sync first). Section edits are
+ergonomic — "change my tagline" only re-sends Section 2, not the whole packet:
+
+```text
+update_career_packet section="2" section_content='- **Builder PM** — "ships product with engineering teeth"'
 ```
 
-`reseed` writes a NEW active version (the previous version is demoted, history kept).
-The chat can also call the `reseed_career_packet` MCP tool to do the same thing without
-leaving the conversation. `doctor` warns when `cv.md` changed since the last reseed, and
-`init` auto-reseeds when it detects the mismatch.
+**2. File-driven (cv.md / profile.yml are the source).** Edit `cv.md` /
+`config/profile.yml`, then **reseed** to rebuild the packet from them:
 
-> **Source of truth — avoid packet drift.** The active packet in the DB is *runtime state*;
-> `cv.md` + `config/profile.yml` (+ `modes/career_packet.md`) are the *source of truth*.
-> Edit the source files and reseed — **don't hand-edit Sections 1–8 of the packet directly**,
-> because the next reseed regenerates them and silently drops DB-only edits. Identity / links
-> / taglines → `config/profile.yml`; experience / projects / skills / education → `cv.md`;
-> standing policy with no CV/profile field (naming conventions, rendering rules, custom
-> guardrails) → `modes/career_packet.md` Section 9 (preserved across reseeds).
+```bash
+npx job_ops-mcp reseed            # safe: refuses if the packet has chat edits not in cv.md
+npx job_ops-mcp reseed --force    # rebuild from cv.md anyway (drops chat edits)
+```
+
+**Bringing the two back in sync.** When you've been editing in chat and want `cv.md` to
+catch up, run `sync_packet_to_cv` — it writes the packet back into `cv.md` + `profile.yml`
+so the source files reflect your chat edits (and a later `reseed` reproduces them instead of
+clobbering them). So the two directions are symmetric: **reseed** (cv.md → packet) and
+**sync-back** (packet → cv.md), both explicit, neither automatic.
+
+`reseed` writes a NEW active version (previous demoted, history kept). `doctor` reports when
+the packet is chat-edited (expected — not a nag) vs when `cv.md` changed under a file-driven
+packet. Standing policy with no CV/profile field (naming conventions, rendering rules, custom
+guardrails) lives in `modes/career_packet.md` Section 9, which reseed always preserves.
 
 > **Operator's guide / project memory:** [`docs/PROJECT_MEMORY.md`](docs/PROJECT_MEMORY.md)
 > is a single self-contained reference (architecture, every tool, env vars, setup, the
@@ -96,7 +107,7 @@ without one.
 
 ---
 
-## Tools (38 — one MCP `tools/list` call away)
+## Tools (39 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
@@ -107,7 +118,7 @@ without one.
 | **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
 | **Interview / offer** | `extract_stories`, `get_story_bank`, `negotiation_brief` |
 | **Research** | `deep_research`, `enrich_company`, `daily_digest` |
-| **Profile + ops** | `get_career_packet`, `update_career_packet`, `update_profile` (elicitation), `cost_estimate` |
+| **Profile + ops** | `get_career_packet`, `update_career_packet` (chat edits, section-level), `reseed_career_packet` (safe by default), `sync_packet_to_cv` (packet → cv.md), `update_profile` (elicitation), `cost_estimate` |
 | **Apply (preview only — never submits)** | `apply_prefill` |
 | **Visa (optional, can be hidden)** | `visa_signal`, `import_h1b`, `import_linkedin` |
 | **Scheduler (opt-in cron, off by default)** | `scheduler_status`, `scheduler_enable`, `scheduler_disable` |

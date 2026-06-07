@@ -13,7 +13,7 @@
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **40 tools** + **6
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **41 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -91,7 +91,7 @@ directions (see §12):
 
 ---
 
-## 3. The 40 tools (grouped)
+## 3. The 41 tools (grouped)
 
 Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
 
@@ -125,6 +125,13 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 **Outreach** (all draft-only; you send manually)
 - `find_warm_intros` — people you know at a target company (non-recruiters, ranked).
 - `find_founders` — founders/C-suite in your network.
+- `add_contacts` — insert/update **1..N** network contacts from chat in one call (complements
+  the `import_linkedin` CSV path; for capturing people found mid-search). Upsert (match on
+  `linkedin_url`, else `full_name` + company — no silent duplicates), same company alias
+  resolution, title-based role-flag inference, merge-don't-clobber on update. Writes to
+  `linkedin_connections`, so contacts are discoverable by `find_warm_intros`/`find_founders`.
+  Only `full_name` required; partial contacts are stored and gaps reported per contact. The
+  client parses free-text into the structured fields first.
 - `draft_outreach` — warm-intro / founder DM (2-step chat, or `mode=api`); validates safety rails.
 - `draft_followup` / `draft_reply` — nudge / reply drafts.
 - `get_outreach_queue` / `update_outreach` / `get_followups_due` — manage the queue + due nudges.

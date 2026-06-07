@@ -40,6 +40,7 @@ import {
 
 // G4 — visa
 import { visaSignalTool, importH1bTool, importLinkedinTool } from './tools/visa.js';
+import { addContactsTool } from './tools/add_contacts.js';
 
 // G5 — stories + negotiation
 import { extractStoriesTool, getStoryBankTool, negotiationBriefTool } from './tools/stories.js';
@@ -75,7 +76,7 @@ const FULL_TOOLSET: AnyToolDef[] = [
   scanPortalsTool,
   findWarmIntrosTool, findFoundersTool, draftOutreachTool, getOutreachQueueTool,
   updateOutreachTool, getFollowupsDueTool, draftFollowupTool, draftReplyTool,
-  visaSignalTool, importH1bTool, importLinkedinTool,
+  visaSignalTool, importH1bTool, importLinkedinTool, addContactsTool,
   extractStoriesTool, getStoryBankTool, negotiationBriefTool,
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,

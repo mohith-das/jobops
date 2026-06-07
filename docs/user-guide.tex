@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.9.2} \\
+\textsf{\small\bfseries Version} & \texttt{0.9.3} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 40 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 41 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 40 tools.
+One process. Three planes. Six MCP resources and 41 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -465,7 +465,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 37--40 tools should appear in the tool picker.
+Restart Claude Desktop. The 38--41 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -571,7 +571,7 @@ export MCP_JSA_SAMPLING=false
 These are \textit{fully optional}. The system works without them.
 
 \begin{itemize}
-\item \textbf{LinkedIn network} \textemdash{} download your data export at LinkedIn $\rightarrow$ Settings $\rightarrow$ Data Privacy $\rightarrow$ Get a copy of your data $\rightarrow$ Connections. Call \tool{import\_linkedin} with the path to \fpath{Connections.csv}. Unlocks \tool{find\_warm\_intros} and \tool{find\_founders}.
+\item \textbf{LinkedIn network} \textemdash{} download your data export at LinkedIn $\rightarrow$ Settings $\rightarrow$ Data Privacy $\rightarrow$ Get a copy of your data $\rightarrow$ Connections. Call \tool{import\_linkedin} with the path to \fpath{Connections.csv}. Unlocks \tool{find\_warm\_intros} and \tool{find\_founders}. No CSV? Use \tool{add\_contacts} to add people one batch at a time from chat \textemdash{} same store, same discovery.
 \item \textbf{H1B visa signal} \textemdash{} download a DOL OFLC quarterly LCA disclosure CSV from \href{https://www.dol.gov/agencies/eta/foreign-labor/performance}{dol.gov}. Call \tool{import\_h1b}. Unlocks \tool{visa\_signal} (returns a friendliness band per company).
 \end{itemize}
 
@@ -723,7 +723,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-40 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+41 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -767,6 +767,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 \begin{description}[leftmargin=0pt]
 \item[\tool{find\_warm\_intros}] Joins \tool{jobs} \(\times\) non-recruiter LinkedIn connections at the same company. Filter by \texttt{company} substring and \texttt{min\_score}. Sorted by score then contact priority (engineering peers $\rightarrow$ leadership $\rightarrow$ others).
 \item[\tool{find\_founders}] Founders / CEO / CTO / c-suite from your network, derived via \tool{v\_founder\_network}. Filter by \texttt{kind}. Stealth-company rows are flagged but excluded by default.
+\item[\tool{add\_contacts}] Insert/update \textbf{1..N} network contacts from chat in one transaction \textemdash{} complements the bulk \tool{import\_linkedin} CSV path, for people found mid-search. Upserts into \fpath{linkedin\_connections} (matched on \texttt{linkedin\_url}, else \texttt{full\_name} + company \textemdash{} no silent duplicates), resolves company names with the same alias normalization, infers \texttt{is\_recruiter}/\texttt{is\_engineering}/\texttt{is\_leadership} from the title unless you pass them, and merges (never clobbers) on update. Only \texttt{full\_name} is required; partial contacts are stored and the per-contact result reports what was missing/unresolved. Invalid rows (no \texttt{full\_name}) are skipped + reported, not failing the batch. The client parses free-text/pasted info into the structured fields first.
 \item[\tool{draft\_outreach}] Two-step chat: step 1 returns connection + job context + outreach tone rules; step 2 takes the chat-drafted \texttt{message} and persists it after validation (char cap, no emojis, no exclamation marks, no ``refer me'', no visa mentions). \texttt{api} mode does the LLM call inline.
 \item[\tool{draft\_followup}] 1\textendash{}2 line nudge for sent-but-unanswered DMs. Same safety rails. Capped at 300 chars.
 \item[\tool{draft\_reply}] Contextual draft when someone has replied. Takes the received reply text, returns a tone-matched response for human editing. Cap 800 chars.

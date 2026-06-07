@@ -107,7 +107,7 @@ without one.
 
 ---
 
-## Tools (40 — one MCP `tools/list` call away)
+## Tools (41 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
@@ -115,7 +115,7 @@ without one.
 | **Materials** | `generate_materials`, `render_pdf` (PDF / `.tex` / `.docx`), `get_report` |
 | **Tracker** | `get_tracker`, `update_status`, `mark_ready_to_apply` |
 | **Sourcing** | `scan_portals` (Greenhouse + Ashby + Lever + Workday + Amazon + Google + generic Playwright) |
-| **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
+| **Outreach** | `find_warm_intros`, `find_founders`, `add_contacts` (insert/update network contacts from chat), `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
 | **Interview / offer** | `extract_stories`, `get_story_bank`, `negotiation_brief` |
 | **Research** | `deep_research`, `enrich_company`, `daily_digest` |
 | **Profile + ops** | `get_career_packet`, `update_career_packet` (chat edits, section-level), `reseed_career_packet` (safe by default), `sync_packet_to_cv` (packet → cv.md), `update_profile` (elicitation), `cost_estimate`, `doctor` (read-only health report) |
@@ -532,6 +532,27 @@ import_linkedin path="/absolute/path/to/Connections.csv"
 
 Now `find_warm_intros(company="…")` returns the people you actually know who work there
 (filtered to non-recruiters, sorted by engineering / leadership weight).
+
+**Adding contacts from chat (no CSV).** Found someone useful mid-search, or want to capture a
+few people without a bulk export? Use **`add_contacts`** — it takes an array of 1..N contacts
+in one call and upserts them into the same store, so they show up in `find_warm_intros` /
+`find_founders` immediately:
+
+```text
+add_contacts contacts=[
+  { "full_name": "Dana Lee", "company": "Anthropic, Inc.", "title": "Staff Engineer",
+    "linkedin_url": "https://linkedin.com/in/dana-lee" },
+  { "full_name": "Sam Park", "company": "Vercel", "title": "Head of Talent" }
+]
+```
+
+Only `full_name` is required. It matches existing people (by `linkedin_url`, else
+`full_name` + company) so there are **no silent duplicates**; merges on update (omitted
+fields are preserved); resolves company names with the **same fuzzy normalization** as the CSV
+path; and infers `is_recruiter` / `is_engineering` / `is_leadership` from the title unless you
+pass them. Partial contacts are stored and the per-contact result reports what was missing
+(`no linkedin_url`, company unmatched, …) so the chat can ask you to fill the gaps. (Claude
+parses your free-text/pasted contact info into these fields before calling.)
 
 Company names are matched **fuzzily** so legal-name variants line up: `import_linkedin`,
 `import_h1b`, JD ingestion, `visa_signal`, and `find_warm_intros` all normalize names by

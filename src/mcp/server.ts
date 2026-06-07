@@ -56,6 +56,7 @@ import {
 import { reseedCareerPacketTool } from './tools/reseed.js';
 import { syncPacketToCvTool } from './tools/sync_packet.js';
 import { updateProfileTool } from './tools/profile_elicit.js';
+import { doctorTool } from './tools/doctor.js';
 
 // G8 — apply prefill
 import { applyPrefillTool } from './tools/apply_prefill.js';
@@ -79,6 +80,7 @@ const FULL_TOOLSET: AnyToolDef[] = [
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
   getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, syncPacketToCvTool, updateProfileTool, enrichCompanyTool, costEstimateTool,
+  doctorTool,
   applyPrefillTool,
   schedulerStatusTool, schedulerEnableTool, schedulerDisableTool,
 ];

@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.9.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.9.1} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 39 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 40 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 39 tools.
+One process. Three planes. Six MCP resources and 40 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -465,7 +465,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 36--39 tools should appear in the tool picker.
+Restart Claude Desktop. The 37--40 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -723,7 +723,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-39 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+40 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -805,6 +805,7 @@ When \env{MCP\_JSA\_VISA\_SCORING=false}, all three visa tools are hidden from \
 \item[\tool{deep\_research}] Company brief \textemdash{} aggregates current enrichments + top jobs + warm intros + H1B signal. With \texttt{notes} + \texttt{kind} provided in \texttt{api} mode, summarizes the notes into a single enrichment row.
 \item[\tool{daily\_digest}] Morning summary \textemdash{} new top jobs since last digest, follow-ups due, recent status changes, cost snapshot. Stamps \texttt{digest\_state.last\_digest\_at} unless \texttt{dry\_run}.
 \item[\tool{cost\_estimate}] LLM cost aggregated by provider / model / tool over the last N days (default 30). USD estimate based on a built-in rate table.
+\item[\tool{doctor}] Read-only health report for the running server \textemdash{} the same checks as the CLI \cmd{doctor} command (packet~$\leftrightarrow$~cv.md sync state, LLM provider/key, sampling + auth posture, active template, modes bundled-vs-overridden, visa scoring, public base URL, Chromium, Node, config files), returned as structured \texttt{\{ ok, counts, checks[], summary \}}. Cold-start-only checks (e.g. the bind target) are relabelled as informational since the server is obviously already bound. Mutates nothing.
 \end{description}
 
 \subsection*{Apply (preview only)}

@@ -13,7 +13,7 @@
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **39 tools** + **6
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **40 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -91,7 +91,7 @@ directions (see §12):
 
 ---
 
-## 3. The 39 tools (grouped)
+## 3. The 40 tools (grouped)
 
 Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
 
@@ -156,6 +156,11 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   write `profile.yml`, and reseed in one step (see §8).
 - `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as
   client-borne $0).
+- `doctor` — **read-only health report** (same checks as the `npx job_ops-mcp doctor` CLI):
+  packet ↔ cv.md sync state (incl. chat-edited / cv-edited-after-reseed), LLM provider+key,
+  sampling + auth posture, active template, modes (bundled vs overridden), visa scoring,
+  public base URL, Chromium, Node, config files. Returns structured `{ ok, counts, checks[],
+  summary }`. Mutates nothing.
 
 **Apply (preview only — never submits)**
 - `apply_prefill` — opens the application page, drafts field values, screenshots, and stops.

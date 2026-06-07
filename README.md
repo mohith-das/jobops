@@ -107,7 +107,7 @@ without one.
 
 ---
 
-## Tools (39 — one MCP `tools/list` call away)
+## Tools (40 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
@@ -118,7 +118,7 @@ without one.
 | **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
 | **Interview / offer** | `extract_stories`, `get_story_bank`, `negotiation_brief` |
 | **Research** | `deep_research`, `enrich_company`, `daily_digest` |
-| **Profile + ops** | `get_career_packet`, `update_career_packet` (chat edits, section-level), `reseed_career_packet` (safe by default), `sync_packet_to_cv` (packet → cv.md), `update_profile` (elicitation), `cost_estimate` |
+| **Profile + ops** | `get_career_packet`, `update_career_packet` (chat edits, section-level), `reseed_career_packet` (safe by default), `sync_packet_to_cv` (packet → cv.md), `update_profile` (elicitation), `cost_estimate`, `doctor` (read-only health report) |
 | **Apply (preview only — never submits)** | `apply_prefill` |
 | **Visa (optional, can be hidden)** | `visa_signal`, `import_h1b`, `import_linkedin` |
 | **Scheduler (opt-in cron, off by default)** | `scheduler_status`, `scheduler_enable`, `scheduler_disable` |
@@ -126,6 +126,11 @@ without one.
 Six MCP **resources** carry the editable behaviour — rubric, report_format,
 tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all loaded from
 `modes/*.md` and live-reloaded on edit. Tune scoring or tone without touching code.
+
+> **Tip:** ask the chat to run **`doctor`** anytime — it's a read-only health report (same
+> checks as the `npx job_ops-mcp doctor` CLI command) covering packet ↔ cv.md sync state,
+> LLM provider/key, sampling + auth posture, active template, modes, visa scoring, and the
+> public base URL. Handy for "is my server wired right?" without leaving chat.
 
 ---
 

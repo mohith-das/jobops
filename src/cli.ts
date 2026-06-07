@@ -191,174 +191,21 @@ async function ensureChromium(): Promise<void> {
 
 async function cmdDoctor() {
   console.log(c.bold(`\njob_ops-mcp doctor\n`));
-  let failures = 0;
+  const { runDoctorChecks } = await import('./core/doctor.js');
+  const report = await runDoctorChecks({ context: 'cold' });
 
-  // 1. Node version
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  if (nodeMajor >= 20) console.log(`  ${tick()} Node ${process.versions.node} (>= 20 required)`);
-  else { console.log(`  ${cross()} Node ${process.versions.node} — need >= 20. Install from https://nodejs.org/`); failures++; }
-
-  // 2. Chromium
-  let chromiumOk = false;
-  try {
-    const { chromium } = await import('playwright');
-    const p = chromium.executablePath();
-    if (p && existsSync(p)) { console.log(`  ${tick()} Playwright Chromium: ${p}`); chromiumOk = true; }
-  } catch { /* fall through */ }
-  if (!chromiumOk) { console.log(`  ${cross()} Playwright Chromium missing. Fix: ${c.bold('npx playwright install chromium')}`); failures++; }
-
-  // 3. Project root + user config
-  const projectRoot = process.env.MCP_JSA_PROJECT_ROOT || process.cwd();
-  console.log(`  ${tick()} project root: ${projectRoot}`);
-  for (const file of ['cv.md', 'config/profile.yml', 'portals.yml']) {
-    const p = resolve(projectRoot, file);
-    if (existsSync(p)) {
-      const size = statSync(p).size;
-      const tooSmall = size < 200;
-      if (tooSmall) { console.log(`  ${warn()} ${file} present but suspiciously small (${size} bytes) — did you replace the placeholders?`); }
-      else { console.log(`  ${tick()} ${file} (${size} bytes)`); }
-    } else {
-      console.log(`  ${cross()} ${file} missing. Fix: ${c.bold('npx job_ops-mcp init')}`);
-      failures++;
-    }
-  }
-
-  // 4. LLM key (only required for api / batch paths)
-  const provider = (process.env.MCP_JSA_LLM_PROVIDER || 'gemini').toLowerCase();
-  const haveKey = (provider === 'gemini' && !!process.env.GEMINI_API_KEY)
-               || (provider === 'deepseek' && !!process.env.DEEPSEEK_API_KEY);
-  if (haveKey)      console.log(`  ${tick()} LLM provider: ${provider} (key set)`);
-  else if (provider === 'none') console.log(`  ${tick()} LLM provider: none (chat-mode only)`);
-  else              console.log(`  ${warn()} LLM provider: ${provider} but no API key. chat-mode tools work; api/batch tools will error. Set ${c.bold(provider === 'gemini' ? 'GEMINI_API_KEY' : 'DEEPSEEK_API_KEY')} to enable.`);
-
-  // 5. Visa scoring flag
-  const visaOn = (process.env.MCP_JSA_VISA_SCORING ?? 'true').toLowerCase() !== 'false';
-  console.log(`  ${tick()} visa scoring: ${visaOn ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`);
-
-  // 5a. Templates — informational. List bundled + user themes and the active default.
-  try {
-    const { listThemes, effectiveDefaultTemplate } = await import('./core/templates.js');
-    const themes = listThemes();
-    const def    = effectiveDefaultTemplate();
-    const userCount    = themes.filter(t => t.source === 'user').length;
-    const bundledCount = themes.length - userCount;
-    const userPart = userCount ? `, ${userCount} user` : '';
-    console.log(`  ${tick()} templates: ${bundledCount} bundled${userPart} — default: ${c.bold(def)}`);
-    if (process.env.MCP_JSA_DEFAULT_TEMPLATE && process.env.MCP_JSA_DEFAULT_TEMPLATE !== def) {
-      console.log(`         ${c.yellow('!')} MCP_JSA_DEFAULT_TEMPLATE="${process.env.MCP_JSA_DEFAULT_TEMPLATE}" not found, falling back to "${def}".`);
-    }
-    if (!process.env.MCP_JSA_TEMPLATE_DIR) {
-      console.log(`         ${c.dim('set MCP_JSA_TEMPLATE_DIR to add a user themes dir — see TEMPLATES.md.')}`);
-    }
-  } catch (e: any) {
-    console.log(`  ${warn()} templates check failed: ${e?.message ?? e}`);
-  }
-
-  // 5a-bis. Mode files — report which are user-overridden (project root) vs bundled.
-  try {
-    const { MODE_FILES, modeSource } = await import('./core/modes.js');
-    const sources = MODE_FILES.map(f => ({ f, src: modeSource(f) }));
-    const overridden = sources.filter(s => s.src === 'user').map(s => s.f.replace(/\.md$/, ''));
-    const missing    = sources.filter(s => s.src === 'missing').map(s => s.f);
-    if (missing.length) {
-      console.log(`  ${cross()} mode file(s) missing entirely: ${missing.join(', ')} — reinstall the package.`);
-      failures++;
-    }
-    if (overridden.length) {
-      const rest = overridden.length < MODE_FILES.length ? '; rest bundled defaults' : '';
-      console.log(`  ${tick()} modes: ${overridden.length}/${MODE_FILES.length} user-overridden (${overridden.join(', ')})${rest}`);
-    } else {
-      console.log(`  ${tick()} modes: all bundled defaults — edit ${c.bold('modes/*.md')} in your project root to customize (init scaffolds them)`);
-    }
-  } catch (e: any) {
-    console.log(`  ${warn()} modes check failed: ${e?.message ?? e}`);
-  }
-
-  // 5a-ter. Auth posture — report whether the PII surface is protected.
-  try {
-    const { config: cfg } = await import('./config.js');
-    const p = cfg.authPolicy;
-    if (p.mode === 'open') {
-      console.log(`  ${tick()} auth: open (localhost-only bind — frictionless, no token). ${c.dim('PII stays on 127.0.0.1.')}`);
-      console.log(`         ${c.dim('To expose remotely, set MCP_JSA_HOST + MCP_JSA_AUTH_TOKEN (required).')}`);
-    } else if (p.mode === 'token') {
-      console.log(`  ${tick()} auth: bearer token required on /mcp, /files, dashboard ${c.dim(p.isLocalhost ? '(localhost + token)' : '(remote bind — PII protected)')}`);
-    } else {
-      console.log(`  ${cross()} auth: DENY — ${p.reason}`);
-      console.log(`         Fix: ${c.bold('export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"')} before exposing beyond localhost.`);
-      failures++;
-    }
-  } catch { /* config never throws — defensive */ }
-
-  // 5a-quater. Sampling vs BYO key — how api-path scoring will run. Read the resolved
-  // config flag (not a re-parse of the env var) so doctor and the runtime never disagree.
-  try {
-    const { config: cfg } = await import('./config.js');
-    if (cfg.samplingEnabled) {
-      console.log(`  ${tick()} scoring: MCP sampling preferred over stdio (client model — no key); BYO key is the fallback`);
-      console.log(`         ${c.dim('sampling/elicitation need a stdio client (e.g. Claude Desktop); HTTP clients use the fallback paths.')}`);
-    } else {
-      console.log(`  ${warn()} scoring: sampling disabled (MCP_JSA_SAMPLING=false) — api paths require a BYO LLM key`);
-    }
-  } catch { /* config never throws */ }
-
-  // 5b. Public base URL — informational, never a failure.
-  try {
-    const { config: cfg } = await import('./config.js');
-    if (cfg.publicBaseUrlIsExplicit) {
-      console.log(`  ${tick()} public base URL: ${c.bold(cfg.publicBaseUrl)}  (from MCP_JSA_PUBLIC_BASE_URL)`);
-      if (cfg.publicBaseUrl !== cfg.listenUrl) {
-        console.log(`         listen URL is ${cfg.listenUrl} — artifact links will use the public URL above.`);
-      }
-    } else {
-      console.log(`  ${tick()} public base URL: ${cfg.publicBaseUrl}  (default — set MCP_JSA_PUBLIC_BASE_URL to override)`);
-    }
-  } catch { /* config never throws — defensive */ }
-
-  // 6. Career-packet staleness check (only meaningful if the DB exists).
-  try {
-    const { getDb } = await import('./db.js');
-    getDb();
-    const { getActiveCareerPacket, loadProjectFiles, packetStatus } =
-      await import('./core/profile.js');
-    const active = getActiveCareerPacket();
-    const status = packetStatus({ active, cvMd: loadProjectFiles().cvMd });
-    const fixReseed = c.bold('npx job_ops-mcp reseed');
-    const fixInit   = c.bold('npx job_ops-mcp init');
-    switch (status) {
-      case 'no_packet':
-        console.log(`  ${cross()} no active career_packet. Fix: ${fixInit}`);
-        failures++;
-        break;
-      case 'packet_chat_edited':
-        console.log(`  ${tick()} career_packet v${active!.version} is ${c.bold('chat-edited')} (ahead of cv.md) — expected in chat-driven mode.`);
-        console.log(`         ${c.dim('reseed is safe: it will NOT overwrite these edits without force.')}`);
-        console.log(`         ${c.dim(`Want cv.md to be the source instead? Run the ${c.bold('sync_packet_to_cv')} tool to write edits back, or ${fixReseed} --force to rebuild from cv.md.`)}`);
-        break;
-      case 'no_cv':
-        console.log(`  ${warn()} cv.md missing — packet is identity-only. Fix: create cv.md, then ${fixReseed}.`);
-        break;
-      case 'cv_is_example':
-        console.log(`  ${warn()} cv.md is still the example template. Fill it in, then ${fixReseed}.`);
-        break;
-      case 'cv_edited_since_seed':
-        console.log(`  ${cross()} cv.md was edited after the last reseed. Run ${fixReseed} to refresh.`);
-        failures++;
-        break;
-      case 'packet_is_template':
-        console.log(`  ${warn()} career_packet v${active!.version} still has TODO markers. Run ${fixReseed}.`);
-        break;
-      case 'ok':
-        console.log(`  ${tick()} career_packet v${active!.version} matches current cv.md`);
-        break;
-    }
-  } catch {
-    console.log(`  ${warn()} career_packet check skipped — DB not initialized (run ${c.bold('npx job_ops-mcp init')} first).`);
+  const glyph: Record<string, string> = {
+    pass: tick(), warn: warn(), fail: cross(),
+    info: COLOR ? c.dim('·') : '- ',
+  };
+  for (const chk of report.checks) {
+    console.log(`  ${glyph[chk.status]} ${chk.detail}`);
+    if (chk.fix) console.log(`         ${c.dim(`Fix: ${chk.fix}`)}`);
   }
 
   console.log('');
-  if (failures > 0) { console.log(c.red(`${failures} check(s) failed.`)); process.exit(1); }
-  console.log(c.green('All required checks passed. Run `npx job_ops-mcp start` to boot.\n'));
+  if (!report.ok) { console.log(c.red(report.summary)); process.exit(1); }
+  console.log(c.green(report.summary + '\n'));
 }
 
 // ── connect ─────────────────────────────────────────────────────────────────

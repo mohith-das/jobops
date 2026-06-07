@@ -1,0 +1,413 @@
+# job_ops-mcp — Operator's Guide (project memory)
+
+> A self-contained reference for **job_ops-mcp**, a self-hosted Model Context Protocol (MCP)
+> server for the end-to-end job search. Drop this file into your Claude Desktop (or any MCP
+> client) **project memory** so you can ask "how do I X?" and get answers, and modify the
+> tool confidently. This documents the **tool**, not any individual's job search — it is
+> generic and public-repo-safe.
+>
+> Repo: https://github.com/mohith-das/job_ops-mcp · npm: `job_ops-mcp` · License: MIT
+> Current line: **0.8.x**. Run `npm view job_ops-mcp version` for the latest.
+
+---
+
+## 1. What it is — and the core split
+
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **38 tools** + **6
+editable behaviour resources**. The design principle:
+
+- **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
+  outreach. Most tools default to `mode: "chat"`: the server returns the rubric + context,
+  the chat does the thinking, then calls the tool again to persist the result.
+- **The server is the hands.** It scans job portals, normalizes JDs, renders resume/cover
+  artifacts (LaTeX→PDF, `.tex`, `.docx`, HTML), runs a SQLite tracker, drafts/queues
+  outreach, builds a negotiation brief, and returns every artifact as an
+  `http://<host>:<port>/files/...` link the chat can hand back to you.
+
+There is also an **`api` mode** for server-side scoring (see §8 Sampling) — but chat mode
+needs no API key and is the default.
+
+**Guiding principle: _this finds jobs; it does not send them._** No tool ever auto-submits
+an application or auto-sends a DM. Every outward action stops at a draft/preview for a human
+to review and send. (See §9 Hard rules.)
+
+---
+
+## 2. Architecture
+
+Three planes in one process:
+1. **MCP plane** — tools + resources, over **stdio** (e.g. Claude Desktop) or
+   **streamable-HTTP** (e.g. LibreChat, Cursor).
+2. **HTTP plane** — a file server (`/files/*` for rendered artifacts), a tracker dashboard
+   (`/`), `/healthz`, and the `/mcp` endpoint. One port serves all of it.
+3. **Data plane** — a local **SQLite** DB (WAL mode) that holds all runtime state.
+
+### SQLite schema (overview)
+Key tables: `companies`, `company_aliases` (legal-name variants), `target_companies`
+(what the scanner polls), `jobs`, `applications`, `eval_reports`, `career_packet`
+(**versioned**, one `is_active=1` row), `contacts`, `linkedin_connections`, `h1b_filings`,
+`outreach`, `story_bank`, `negotiation_notes`, `enrichment`, `llm_calls` (telemetry →
+`cost_estimate`), `scan_runs`, `scheduler_state`, `digest_state`.
+Helper views: `v_top_jobs`, `v_rated_jobs`, `v_active_pipeline`, `v_apply_ready`,
+`v_jobs_with_warm_intros`, `v_founder_network`, `v_followups_due`, `v_company_h1b_signal`.
+
+### Job lifecycle (state machine)
+`sourced → scored → ready_to_apply → applied → screen → onsite → offer`
+(plus terminal `rejected` / `discarded` / `skip`). Tools move jobs along this machine;
+mutations are serialized through a write lock so concurrent tool calls never interleave.
+
+### modes/ resources (the editable "brain")
+Six markdown files shape behaviour. They ship bundled in the package, but `init` copies
+editable copies into `<project-root>/modes/`. **Loader precedence (per file): the
+project-root copy wins, the bundled default is the fallback.** Re-running `init` never
+overwrites an edited copy (it warns); `doctor` reports which files are user-overridden vs
+bundled. Edits are live-reloaded (no restart) and exposed as MCP resources.
+
+| File | Controls |
+|---|---|
+| `modes/rubric.md` | Scoring dimensions, weights, role priority, archetype override, hard rules |
+| `modes/report_format.md` | The 6-block A–F (+G) evaluation report shape |
+| `modes/tailoring_rules.md` | Resume/cover tailoring decisions per `role_category` |
+| `modes/outreach_tone.md` | Outreach char caps, forbidden phrases, persona |
+| `modes/negotiation_playbook.md` | Negotiation framework + scripts |
+| `modes/career_packet.md` | Career-packet structural template (preamble + Section 9 hard rules) |
+
+### career_packet versioning + the source-of-truth model
+The **career packet** is the authoritative superset of every claim you may make. It is
+**versioned** in the `career_packet` table (one active row; reseeds demote the prior row and
+keep history). It is rebuilt ("reseeded") from:
+- `config/profile.yml` → Section 1 (identity) + Section 2 (taglines)
+- `cv.md` (parsed) → Sections 3–8 (experience bullets, projects, skills, education)
+- `modes/career_packet.md` → the template wrapper + Section 9 hard rules (preserved across reseeds)
+
+> **The DB is runtime state; `cv.md` / `config/profile.yml` are the source of truth.**
+> Edit the **source files** and run **reseed** — do NOT hand-edit the packet in the DB. (See
+> §12 Drift trap.)
+
+---
+
+## 3. The 38 tools (grouped)
+
+Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
+
+**Evaluation**
+- `evaluate_job` — 2-step JD evaluator. Step 1: `input` (URL or pasted JD) → returns
+  normalized JD + rubric + career packet. Step 2: `job_id` + `report` + `scores` → persists
+  the 6-block report + scores, returns a report link. `mode="api"` runs both server-side.
+- `batch_evaluate` — rates all unrated jobs (`score_total IS NULL`); params `role_category`,
+  `company`, `limit`, `concurrency`. Reports an A–F tier distribution + `scored_via`.
+- `get_top_jobs` — highest-scored jobs; params `min_score`, `limit`, `role_category`.
+- `evaluate_training` / `evaluate_project` — score a course/cert or a side-project idea
+  against your profile.
+
+**Materials**
+- `generate_materials` — picks bullets/tagline/projects from the packet per a JD via the
+  tailoring rules; writes tailored bullets + cover draft; runs the visa-leakage scan before
+  persisting.
+- `render_pdf` — renders resume/cover. Params: `job_id`, `kind` (`resume|cover|both`),
+  `formats` (subset of `["pdf","tex","docx"]`), `template` (theme name). Returns `/files/...` links.
+- `get_report` — fetch a saved eval report (HTML link).
+
+**Tracker**
+- `get_tracker` — pipeline view, filterable by status.
+- `update_status` — move a job along the lifecycle.
+- `mark_ready_to_apply` — flag a job as ready.
+
+**Sourcing**
+- `scan_portals` — poll tracked ATS endpoints (Greenhouse, Ashby, Lever, Workday, Amazon,
+  Google, generic Playwright); normalize + dedupe into `jobs`.
+
+**Outreach** (all draft-only; you send manually)
+- `find_warm_intros` — people you know at a target company (non-recruiters, ranked).
+- `find_founders` — founders/C-suite in your network.
+- `draft_outreach` — warm-intro / founder DM (2-step chat, or `mode=api`); validates safety rails.
+- `draft_followup` / `draft_reply` — nudge / reply drafts.
+- `get_outreach_queue` / `update_outreach` / `get_followups_due` — manage the queue + due nudges.
+
+**Interview / offer**
+- `extract_stories` — mine STAR stories from your CV/packet into `story_bank`.
+- `get_story_bank` — retrieve stories.
+- `negotiation_brief` — build an anchor + pillars + knobs brief for an offer.
+
+**Research**
+- `deep_research` — structured company/role research prompt + context.
+- `enrich_company` — fill company metadata.
+- `daily_digest` — a morning summary of new high-scoring jobs + due follow-ups.
+
+**Profile + ops**
+- `get_career_packet` — read the active packet.
+- `update_career_packet` — write a new packet version (advanced; prefer reseed from sources).
+- `reseed_career_packet` — rebuild the active packet from `cv.md` + `profile.yml` (the
+  normal way to apply CV/profile edits).
+- `update_profile` — capture identity fields + taglines via elicitation (or `fields={...}`),
+  write `profile.yml`, and reseed in one step (see §8).
+- `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as
+  client-borne $0).
+
+**Apply (preview only — never submits)**
+- `apply_prefill` — opens the application page, drafts field values, screenshots, and stops.
+
+**Visa (optional; hidden when `MCP_JSA_VISA_SCORING=false`)**
+- `visa_signal` — H1B-friendliness band for a company (internal scoring only).
+- `import_h1b` — bulk-load a DOL OFLC LCA disclosure CSV.
+- `import_linkedin` — bulk-load a LinkedIn `Connections.csv` (path can be captured
+  out-of-band via URL-mode elicitation — see §8).
+
+**Scheduler (opt-in cron, off by default)**
+- `scheduler_status` / `scheduler_enable` / `scheduler_disable` — run scans + batch rates on
+  a cadence while the server is alive.
+
+---
+
+## 4. Environment variables
+
+| Var | Default | Purpose |
+|---|---|---|
+| `MCP_JSA_PORT` | `7891` | HTTP port (MCP + file server + dashboard) |
+| `MCP_JSA_HOST` | `127.0.0.1` | Bind host. Non-localhost ⇒ requires `MCP_JSA_AUTH_TOKEN` (see §10) |
+| `MCP_JSA_PROJECT_ROOT` | cwd | Where `cv.md` / `config/profile.yml` / `portals.yml` / `modes/` live |
+| `MCP_JSA_DATA_DIR` | `<root>/data` | SQLite DB + WAL |
+| `MCP_JSA_OUTPUT_DIR` | `<root>/output` | Rendered artifacts (PDF/tex/docx/report HTML) |
+| `MCP_JSA_PUBLIC_BASE_URL` | host:port | URL emitted in artifact links (set on remote/Tailscale/LAN) |
+| `MCP_JSA_TEMPLATE_DIR` | _empty_ | User theme dir; overrides bundled themes of the same name |
+| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used by `render_pdf` when no `template` arg given |
+| `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files`, dashboard. **Required** for non-localhost bind |
+| `MCP_JSA_SAMPLING` | `true` | Prefer MCP sampling for `api`/batch scoring; `false` forces BYO key |
+| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key fallback for scoring: `gemini` / `deepseek` / `none` |
+| `MCP_JSA_LLM_MODEL` | _empty_ | Provider model id |
+| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials (only needed when sampling is unavailable) |
+| `MCP_JSA_VISA_SCORING` | `true` | `false` drops visa from the rubric + hides the visa tools |
+| `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
+
+---
+
+## 5. Setup (first run)
+
+```bash
+# 1. Scaffold cv.md, config/profile.yml, portals.yml, modes/*.md + the SQLite DB
+npx job_ops-mcp@latest init        # idempotent; never overwrites edited files
+
+# 2. Edit the three source files — replace every <TODO> placeholder:
+#    cv.md            → your experience, projects, skills, education
+#    config/profile.yml → identity, target roles, taglines, comp/location
+#    portals.yml      → companies + scan filters
+#    (optional) modes/*.md → tune rubric / tailoring / tone
+
+# 3. Rebuild the career packet from your now-real cv.md + profile.yml
+npx job_ops-mcp@latest reseed
+
+# 4. Confirm wiring (Node, Chromium, files, modes, auth, scoring backend, packet freshness)
+npx job_ops-mcp@latest doctor
+
+# 5. Boot (HTTP). Chromium auto-installs on first run.
+npx job_ops-mcp@latest start
+```
+
+CLI commands: `init`, `start`, `start --stdio`, `reseed`, `templates`, `doctor`, `connect`,
+`help`, `--version`.
+
+### Claude Desktop (stdio transport)
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) /
+`%APPDATA%/Claude/...` (Windows):
+```jsonc
+{
+  "mcpServers": {
+    "job_ops-mcp": {
+      "command": "npx",
+      "args": ["-y", "job_ops-mcp@0.8.0", "start", "--stdio"],
+      "env": {
+        "MCP_JSA_PORT": "7891",
+        "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search-dir"
+        // optional: MCP_JSA_TEMPLATE_DIR, MCP_JSA_DEFAULT_TEMPLATE, MCP_JSA_VISA_SCORING, ...
+      }
+    }
+  }
+}
+```
+**Pin an explicit version** (`@0.8.0`) so npx doesn't silently reuse a stale cache; bump it
+deliberately. After any config edit, **fully quit and reopen** Claude Desktop. `--stdio`
+puts MCP on stdin/stdout while the HTTP file server still runs so `/files/*` links resolve.
+Run `connect` to print ready-made config blocks.
+
+### LibreChat (streamable-HTTP) — host process
+In `librechat.yaml`:
+```yaml
+mcpServers:
+  job_ops-mcp:
+    type: streamable-http
+    url: http://127.0.0.1:7891/mcp
+    timeout: 60000
+```
+
+### LibreChat in Docker
+Inside a container `127.0.0.1` is the container, not the host. Use `host.docker.internal`
+(Docker Desktop) or a LAN IP, **and** allowlist it (LibreChat blocks private addrs by default):
+```yaml
+mcpServers:
+  job_ops-mcp:
+    type: streamable-http
+    url: http://host.docker.internal:7891/mcp
+    timeout: 60000
+mcpSettings:
+  allowedAddresses: ["host.docker.internal:7891"]
+```
+On Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the LibreChat service,
+or use the host's LAN IP and allowlist that. Run `connect` for these blocks.
+
+---
+
+## 6. Custom resume / cover templates
+
+A "theme" is a directory holding any of `resume.tex`, `cover.tex`, `resume.html`,
+`cover.html`. Each is a plain template with `{{PLACEHOLDER}}` slots the renderer fills with
+the same tailored content used for the bundled `default` theme (see `TEMPLATES.md` in the
+repo for the full placeholder contract, e.g. `{{HEADER}}`, `{{EXPERIENCE}}`,
+`{{PROJECTS}}`, `{{SKILLS}}`, `{{COVER_BODY}}`).
+
+```bash
+mkdir -p ~/job-themes/mytheme        # author resume.tex/cover.tex/resume.html/cover.html
+export MCP_JSA_TEMPLATE_DIR=~/job-themes
+export MCP_JSA_DEFAULT_TEMPLATE=mytheme    # or pass template="mytheme" to render_pdf
+npx job_ops-mcp templates            # lists bundled + user themes; marks the default
+```
+The loader checks `MCP_JSA_TEMPLATE_DIR` first, so a `default/` folder there overrides the
+bundled default; brand-new themes are also picked up. A theme missing a placeholder drops
+that section gracefully. A malformed theme errors with the theme name + file path (no raw
+LaTeX backtrace). `.docx` is generated programmatically and does not use themes.
+
+---
+
+## 7. The daily operating workflow
+
+1. **Scan** — `scan_portals` (or let the scheduler poll) pulls new postings into `jobs`.
+2. **Rate** — `batch_evaluate` scores the unrated ones; `get_top_jobs` surfaces the best.
+3. **Evaluate a specific JD** — paste a URL/JD into `evaluate_job`; read the 6-block report.
+4. **Tailor + render** — `generate_materials` then `render_pdf` (PDF/tex/docx) for top picks.
+5. **Apply (manually)** — `apply_prefill` opens the page + drafts fields + screenshots; you
+   review and submit. Then `update_status` / `mark_ready_to_apply`.
+6. **Network** — `find_warm_intros` / `find_founders`; `draft_outreach`; you send; then
+   `update_outreach status=sent`. `get_followups_due` + `draft_followup` for nudges.
+7. **Interview/offer** — `extract_stories` / `get_story_bank`; `negotiation_brief` for offers.
+8. **Maintain** — edit `cv.md`/`profile.yml` as you learn; **reseed**; `doctor` to confirm.
+
+---
+
+## 8. Sampling, elicitation, auth (0.8.x features)
+
+All three are **capability-gated**: the server only uses a feature if the connected client
+advertises it; otherwise it falls back to pre-existing paths.
+
+### MCP sampling — scoring without an API key
+`batch_evaluate` and `evaluate_job mode="api"` prefer **MCP sampling**: the server asks the
+**connected client's own model** for the completion (same rubric, same strict-JSON contract).
+- Selection order: **sampling → BYO key (`MCP_JSA_LLM_PROVIDER` + key) → chat mode**.
+- Cost is **client-borne**; `cost_estimate` records sampling calls and flags them $0 server cost.
+- **Transport gate:** sampling is a server→client request, so it works only over a
+  bidirectional transport = **stdio** (e.g. Claude Desktop). Over stateless HTTP it gates off
+  and falls back cleanly (no hang). `MCP_JSA_SAMPLING=false` forces the BYO-key path.
+
+### MCP elicitation — structured input instead of YAML editing
+- `update_profile` uses **form-mode elicitation** to collect identity fields + taglines,
+  writes `config/profile.yml`, and reseeds. Fallbacks: pass `fields={...}`, or edit the YAML.
+- **Sensitive inputs** (a data-export path, credentials) use **URL-mode elicitation**: the
+  server hands you a one-time local URL where you enter the value directly — it never passes
+  through the chat transcript. `import_linkedin` uses this when `path` is omitted.
+- Same transport gate as sampling (stdio); HTTP clients fall back to file/arg paths.
+
+### Auth — protecting the remote / PII surface
+The server handles PII (resume PDFs, connections, employer signal). Posture is decided by
+bind host + token:
+
+| Bind host | `MCP_JSA_AUTH_TOKEN` | Result |
+|---|---|---|
+| `127.0.0.1` (default) | unset | **Open** — frictionless local use |
+| `127.0.0.1` | set | Token required (opt-in even locally) |
+| non-localhost (`0.0.0.0`/LAN/Tailscale) | **unset** | **Refuses to boot** (default-deny) |
+| non-localhost | set | Token required on every PII route |
+
+When required, `/mcp`, `/files/*`, and `/` demand `Authorization: Bearer <token>`; `401`s
+carry a `WWW-Authenticate` header → `/.well-known/oauth-protected-resource` (aligns with the
+MCP 2025-06-18 OAuth Resource Server model, static-token form). Always open: `/healthz`.
+To expose remotely:
+```bash
+export MCP_JSA_HOST=0.0.0.0
+export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
+export MCP_JSA_PUBLIC_BASE_URL="https://your-host.example"
+```
+
+---
+
+## 9. Hard rules (enforced in code, not just documented)
+
+1. **Visa data never reaches a candidate-facing artifact.** A leakage scan runs inside
+   `render_pdf` (on the cover body) and `generate_materials` (on the whole output) *before*
+   persistence; a detected leak **fails** the call. Visa data is internal scoring only.
+2. **Never invent claims outside the career packet.** Only metrics/claims present in the
+   packet (sourced from `cv.md`) are usable; nothing is fabricated.
+3. **Human-in-the-loop everywhere.** No tool auto-submits an application or auto-sends a DM —
+   everything stops at a draft/preview.
+4. **Strict-JSON parsing with visible failure.** Scoring calls record parse errors and leave
+   the score NULL — never silent `(0,0,0,0)`.
+5. **Serialized writes.** All tracker/application/outreach mutations go through a write lock.
+6. **PII never served unauthenticated to a network** — the default-deny boot guard (§8 auth).
+
+**Outreach safety rails** (validated before any DM persists): character caps (typical: warm
+600 / founder 300 / follow-up 300 / reply 800), no visa mentions, no "refer me", no emojis,
+no exclamation marks, no clichés. A failing draft is returned with the offending rule.
+
+---
+
+## 10. Troubleshooting
+
+- **`EADDRINUSE` on (re)start** — a previous server still holds the port. Find and kill it:
+  `lsof -nP -iTCP:7891 -sTCP:LISTEN` then `kill <PID>` (or change `MCP_JSA_PORT`). With
+  Claude Desktop, fully quit the app so it stops the old stdio child before relaunch.
+- **`doctor` says "cv.md was edited after the last reseed"** — your packet is stale. Run
+  `reseed` (CLI `npx job_ops-mcp reseed`, or the `reseed_career_packet` tool).
+- **`doctor` fails on config files / wrong directory** — `doctor`/`start` resolve files from
+  `MCP_JSA_PROJECT_ROOT` (default = current working dir). Run from your job-search dir, or
+  set `MCP_JSA_PROJECT_ROOT` to its absolute path (do this in the Claude Desktop env block).
+- **Stale version via npx** — `npx` caches by version and reuses it. Pin an explicit version
+  in your client config (`job_ops-mcp@0.8.0`); to force-refresh a bare invocation,
+  `rm -rf ~/.npm/_npx` then `npx job_ops-mcp@latest ...`. Confirm with `--version` / `doctor`.
+- **Sampling/elicitation "not working"** — they require a **stdio** client (Claude Desktop).
+  Over HTTP they gate off by design; configure a BYO key, or use chat mode.
+- **Tool list looks short** — visa tools are hidden when `MCP_JSA_VISA_SCORING=false`; that's
+  expected.
+- **Non-localhost bind won't start** — set `MCP_JSA_AUTH_TOKEN` (default-deny, §8).
+
+---
+
+## 11. Layout
+
+```
+<project-root>/
+  cv.md                  # source of truth: experience, projects, skills, education
+  config/profile.yml     # source of truth: identity, target roles, taglines, comp/location
+  portals.yml            # tracked companies + scan filters
+  modes/                 # (optional) editable behaviour files — created by `init`
+  data/                  # SQLite DB (mcp-jsa.db) + WAL — RUNTIME STATE
+  output/                # rendered PDFs / .tex / .docx / report HTML
+```
+
+---
+
+## 12. The drift trap (read this before hand-editing anything)
+
+The DB `career_packet` is **runtime state**; `cv.md` + `config/profile.yml` (+ the
+`modes/career_packet.md` template) are the **source of truth**.
+
+If you hand-edit the active packet directly (e.g. via `update_career_packet`) instead of the
+source files, your edits live **only in the DB**. The next `reseed` rebuilds Sections 1–8
+from the source files and **silently drops** your DB-only edits — so people re-stamp the same
+edits after every reseed. That is "drift."
+
+**Always edit at the source, then reseed:**
+- Identity, naming, links, **taglines** → `config/profile.yml` (taglines auto-fill Section 2).
+- Experience bullets, projects, skills, education → `cv.md`.
+- Standing policy that isn't a CV/profile field (e.g. name-rendering convention, a LaTeX
+  escaping rule, custom hard rules) → `modes/career_packet.md` **Section 9** (and the
+  preamble) — reseed preserves those; it only regenerates Sections 1–8.
+- Then run `reseed_career_packet` (or `npx job_ops-mcp reseed`).
+
+Rule of thumb: if a `reseed` would erase your change, you edited the wrong place.

@@ -11,6 +11,14 @@ When you run `npx job_ops-mcp init` the server seeds this from your `cv.md` +
 This file is also exposed as the `mcp-jsa://career_packet/active` MCP resource so the
 chat can reason against it directly without round-tripping through the DB.
 
+> **Source of truth — avoid packet drift.** The active packet in the DB is *runtime state*.
+> `cv.md` + `config/profile.yml` (+ this template) are the *source of truth*. Edit those and
+> run `reseed_career_packet` — do NOT hand-edit Sections 1–8 in the DB packet, because the
+> next reseed regenerates them from the source files and silently drops DB-only edits.
+> Identity/links/taglines → `config/profile.yml`; experience/projects/skills/education →
+> `cv.md`; standing policy that isn't a CV field → this template's Section 9 (preserved
+> across reseeds).
+
 > **Note:** the headings below are a **template**. After `init` the server replaces
 > Section 1 (identity) from `config/profile.yml` and leaves the rest of the file as
 > editable scaffold. Replace `<TODO>` markers with bullets pulled from your own CV — keep
@@ -89,3 +97,7 @@ Source: `cv.md` work-experience section. One sentence per bullet, action-verb st
 - **Never use cliché phrases** ("passionate about", "leveraged", "spearheaded",
   "facilitated", "synergies", "robust", "seamless", "cutting-edge", "innovative",
   "results-oriented", "proven track record").
+- **Edit at the source, not in the packet.** Identity/links/taglines live in
+  `config/profile.yml`; experience/projects/skills/education live in `cv.md`. Change those
+  and reseed. Add any standing policy that has no CV/profile field (naming conventions,
+  rendering/escaping rules, custom guardrails) here in Section 9 — reseed preserves it.

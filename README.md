@@ -58,6 +58,19 @@ The chat can also call the `reseed_career_packet` MCP tool to do the same thing 
 leaving the conversation. `doctor` warns when `cv.md` changed since the last reseed, and
 `init` auto-reseeds when it detects the mismatch.
 
+> **Source of truth — avoid packet drift.** The active packet in the DB is *runtime state*;
+> `cv.md` + `config/profile.yml` (+ `modes/career_packet.md`) are the *source of truth*.
+> Edit the source files and reseed — **don't hand-edit Sections 1–8 of the packet directly**,
+> because the next reseed regenerates them and silently drops DB-only edits. Identity / links
+> / taglines → `config/profile.yml`; experience / projects / skills / education → `cv.md`;
+> standing policy with no CV/profile field (naming conventions, rendering rules, custom
+> guardrails) → `modes/career_packet.md` Section 9 (preserved across reseeds).
+
+> **Operator's guide / project memory:** [`docs/PROJECT_MEMORY.md`](docs/PROJECT_MEMORY.md)
+> is a single self-contained reference (architecture, every tool, env vars, setup, the
+> template system, sampling/elicitation/auth, hard rules, troubleshooting). Drop it into your
+> MCP client's project memory so you can ask "how do I X?" and get answers.
+
 ---
 
 ## What it does

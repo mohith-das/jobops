@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.8.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.8.1} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -370,6 +370,19 @@ The chat can also call the \tool{reseed\_career\_packet} MCP tool to do the same
 thing without leaving the conversation. \cmd{doctor} warns when \fpath{cv.md}
 changed since the last reseed.
 \end{tipbox}
+
+\begin{warnbox}[Source of truth — avoid packet drift]
+The active packet in the DB is \emph{runtime state}; \fpath{cv.md} + \fpath{config/profile.yml}
+(+ \fpath{modes/career\_packet.md}) are the \emph{source of truth}. Edit the source files and
+reseed \textemdash{} do \textbf{not} hand-edit Sections 1--8 of the packet directly, because the
+next reseed regenerates them from the source files and silently drops DB-only edits (the
+classic ``drift'' trap). Identity / links / taglines $\rightarrow$ \fpath{config/profile.yml};
+experience / projects / skills / education $\rightarrow$ \fpath{cv.md}; standing policy with no
+CV/profile field (naming conventions, rendering rules, custom guardrails) $\rightarrow$
+\fpath{modes/career\_packet.md} Section 9, which reseed preserves. A single self-contained
+operator reference also ships at \fpath{docs/PROJECT\_MEMORY.md} \textemdash{} drop it into your
+MCP client's project memory.
+\end{warnbox}
 
 \subsection*{What \tool{init} creates}
 

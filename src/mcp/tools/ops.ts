@@ -191,7 +191,7 @@ export const dailyDigestTool = defineTool({
       SELECT j.id, j.title, COALESCE(c.name, j.company_name_raw) AS company, j.score_total, j.source_url,
              (SELECT er.html_path FROM eval_reports er WHERE er.job_id = j.id ORDER BY er.created_at DESC LIMIT 1) AS report_html
       FROM jobs j LEFT JOIN companies c ON c.id = j.company_id
-      WHERE j.score_total >= ? AND datetime(j.discovered_at) >= datetime(?)
+      WHERE j.trashed_at IS NULL AND j.score_total >= ? AND datetime(j.discovered_at) >= datetime(?)
       ORDER BY j.score_total DESC LIMIT 25
     `).all(args.min_score, cutoff) as any[];
 
@@ -200,7 +200,7 @@ export const dailyDigestTool = defineTool({
     const recentStatusChanges = db.prepare(`
       SELECT j.id, j.title, COALESCE(c.name, j.company_name_raw) AS company, j.status, j.updated_at
       FROM jobs j LEFT JOIN companies c ON c.id = j.company_id
-      WHERE datetime(j.updated_at) >= datetime(?) AND j.status IN ('applied','screen','onsite','offer','rejected','materials_drafted','ready_to_review')
+      WHERE j.trashed_at IS NULL AND datetime(j.updated_at) >= datetime(?) AND j.status IN ('applied','screen','onsite','offer','rejected','materials_drafted','ready_to_review')
       ORDER BY datetime(j.updated_at) DESC LIMIT 25
     `).all(cutoff) as any[];
 

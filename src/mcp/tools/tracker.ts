@@ -7,16 +7,12 @@ import { z } from 'zod';
 import { config } from '../../config.js';
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
-import { safeJson } from '../../core/llm.js';
 import { fileUrl, trackerUrl } from '../../core/links.js';
+import { JOB_STATUSES, setJobStatus } from '../../core/job_trash.js';
 
-// Allowed transitions — denylist of obvious impossibilities; we don't enforce a strict
-// state machine because the brief allows manual overrides. The CHECK on jobs.status is
-// the hard guard.
-const STATUSES = [
-  'sourced','ready_to_apply','materials_drafted','ready_to_review',
-  'applied','screen','onsite','offer','rejected','discarded','skip',
-] as const;
+// Canonical lifecycle states (the CHECK on jobs.status is the hard guard). Shared with the
+// trash/UI logic via core/job_trash.ts so there's one list.
+const STATUSES = JOB_STATUSES;
 
 const ROLE_CATEGORIES = ['pm','ml_eng','data_eng','analytics_eng','swe','forward_deployed','other'] as const;
 
@@ -35,7 +31,7 @@ export const getTopJobsTool = defineTool({
     limit:         z.number().int().min(1).max(200).default(20),
   },
   handler: async (args) => {
-    const where = ['j.score_total IS NOT NULL', 'j.score_total >= ?'];
+    const where = ['j.trashed_at IS NULL', 'j.score_total IS NOT NULL', 'j.score_total >= ?'];
     const params: any[] = [args.min_score];
     if (args.role_category) { where.push('j.role_category = ?'); params.push(args.role_category); }
     if (args.status)        { where.push('j.status = ?');        params.push(args.status); }
@@ -79,7 +75,7 @@ export const getTrackerTool = defineTool({
     limit:  z.number().int().min(1).max(500).default(100),
   },
   handler: async (args) => {
-    const where: string[] = [];
+    const where: string[] = ['j.trashed_at IS NULL'];
     const params: any[] = [];
     if (args.status) { where.push('j.status = ?'); params.push(args.status); }
     const sql = `
@@ -93,11 +89,11 @@ export const getTrackerTool = defineTool({
         (SELECT a.resume_path FROM applications a WHERE a.job_id = j.id LIMIT 1) AS resume_path,
         (SELECT a.cover_path  FROM applications a WHERE a.job_id = j.id LIMIT 1) AS cover_path
       FROM jobs j LEFT JOIN companies c ON c.id = j.company_id
-      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      WHERE ${where.join(' AND ')}
       ORDER BY datetime(j.discovered_at) DESC LIMIT ?
     `;
     const rows = getDb().prepare(sql).all(...params, args.limit) as any[];
-    const counts = getDb().prepare(`SELECT status, COUNT(*) AS n FROM jobs GROUP BY status`).all() as any[];
+    const counts = getDb().prepare(`SELECT status, COUNT(*) AS n FROM jobs WHERE trashed_at IS NULL GROUP BY status`).all() as any[];
     return okResult({
       counts_by_status: Object.fromEntries(counts.map(c => [c.status, c.n])),
       filtered_count:   rows.length,
@@ -125,27 +121,8 @@ export const updateStatusTool = defineTool({
     note:   z.string().optional(),
   },
   handler: async (args) => {
-    const result = await runInWriteLock(() => {
-      const db = getDb();
-      const existing = db.prepare('SELECT status FROM jobs WHERE id = ?').get(args.job_id) as { status: string } | undefined;
-      if (!existing) return { ok: false, message: `no job ${args.job_id}` };
-      // applied_at gets stamped only on the applied transition; updated_at always.
-      const appliedClause = args.status === 'applied' ? ', applied_at = CURRENT_TIMESTAMP' : '';
-      db.prepare(
-        `UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP${appliedClause} WHERE id = ?`,
-      ).run(args.status, args.job_id);
-      if (args.note) {
-        const cur = db.prepare('SELECT score_detail FROM jobs WHERE id = ?').get(args.job_id) as { score_detail: string | null };
-        const det = safeJson<any>(cur?.score_detail, {});
-        det.status_history = (Array.isArray(det.status_history) ? det.status_history : []);
-        det.status_history.push({
-          at: new Date().toISOString(), from: existing.status, to: args.status, note: args.note,
-        });
-        db.prepare('UPDATE jobs SET score_detail = ? WHERE id = ?').run(JSON.stringify(det), args.job_id);
-      }
-      return { ok: true, from: existing.status, to: args.status };
-    });
-    if (!result.ok) return errResult(result.message ?? 'failed');
+    const result = await setJobStatus(args.job_id, args.status, args.note);
+    if (!result.ok) return errResult(result.message);
     return okResult({ job_id: args.job_id, from: result.from, to: result.to });
   },
 });

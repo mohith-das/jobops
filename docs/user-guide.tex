@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.10.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.11.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 47 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 51 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 47 tools.
+One process. Three planes. Six MCP resources and 51 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -465,7 +465,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 44--47 tools should appear in the tool picker.
+Restart Claude Desktop. The 48--51 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -723,7 +723,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-47 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+51 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -760,7 +760,15 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 \item[\tool{get\_tracker}] Full pipeline snapshot as JSON. Optional \texttt{status} filter. Mirrors the dashboard at \texttt{/}.
 \item[\tool{update\_status}] Move a job to a new status. Stamps \texttt{applied\_at} on the \texttt{applied} transition. Optional \texttt{note} appended to \texttt{score\_detail.status\_history}.
 \item[\tool{mark\_ready\_to\_apply}] Bulk-marks job IDs as \texttt{ready\_to\_apply}. Skips terminal-state rows.
+\item[\tool{delete\_jobs}] \textbf{Soft-delete} 1..N jobs to the trash (by \texttt{job\_ids} and/or \texttt{statuses}, e.g. all \texttt{skip}/\texttt{discard}). Recoverable; trashed jobs drop out of the tracker, \tool{get\_top\_jobs}, and batch rating but are retained. Echoes title + company. Never a hard delete.
+\item[\tool{restore\_jobs}] Move trashed jobs back to their prior state.
+\item[\tool{list\_trashed}] List currently-trashed jobs (title, company, score, prior status, when trashed) for review before restore/purge.
+\item[\tool{purge\_jobs}] \textbf{Hard delete} of trashed jobs only \textemdash{} the sole path to permanent removal. \texttt{job\_ids} or \texttt{purge\_all: true} (which requires \texttt{confirm: true}). Writes a timestamped backup of the affected rows to the project root \emph{before} deleting; echoes what was permanently removed.
 \end{description}
+
+\begin{tipbox}[Trash workflow — chat + UI, one shared implementation]
+Soft-delete is the default destructive action everywhere; hard removal is always explicit, confirmed, and backup-first. In the tracker UI (\texttt{/}) the \textbf{Status} cell is an inline dropdown and each row has a \textbf{Trash} button; the dedicated \texttt{/trash} page lists trashed jobs with \emph{Restore}, per-item \emph{Delete permanently} (confirm), and \emph{Empty trash} (confirm + backup). The UI calls \texttt{/api/*} endpoints that share the exact \fpath{core/job\_trash.ts} logic the chat tools use \textemdash{} so a job trashed in chat appears on \texttt{/trash} and vice-versa.
+\end{tipbox}
 
 \subsection*{Outreach}
 

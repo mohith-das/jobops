@@ -28,6 +28,7 @@ import { getReportTool    } from './tools/get_report.js';
 
 // G1 — tracker queries + mutators
 import { getTopJobsTool, getTrackerTool, updateStatusTool, markReadyToApplyTool } from './tools/tracker.js';
+import { deleteJobsTool, restoreJobsTool, listTrashedTool, purgeJobsTool } from './tools/job_trash.js';
 
 // G2 — portal scanner
 import { scanPortalsTool } from './tools/scan_portals.js';
@@ -75,6 +76,7 @@ const VISA_TOOL_NAMES: ReadonlySet<string> = new Set([
 const FULL_TOOLSET: AnyToolDef[] = [
   evaluateJobTool, renderPdfTool, getReportTool,
   getTopJobsTool, getTrackerTool, updateStatusTool, markReadyToApplyTool,
+  deleteJobsTool, restoreJobsTool, listTrashedTool, purgeJobsTool,
   scanPortalsTool,
   findWarmIntrosTool, findFoundersTool, draftOutreachTool, getOutreachQueueTool,
   updateOutreachTool, getFollowupsDueTool, draftFollowupTool, draftReplyTool,

@@ -115,13 +115,13 @@ without one.
 
 ---
 
-## Tools (47 — one MCP `tools/list` call away)
+## Tools (51 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
 | **Evaluation** | `evaluate_job`, `batch_evaluate`, `get_top_jobs`, `evaluate_training`, `evaluate_project` |
 | **Materials** | `generate_materials`, `render_pdf` (PDF / `.tex` / `.docx`), `get_report` |
-| **Tracker** | `get_tracker`, `update_status`, `mark_ready_to_apply` |
+| **Tracker** | `get_tracker`, `update_status`, `mark_ready_to_apply`, `delete_jobs` (soft-delete → trash), `restore_jobs`, `list_trashed`, `purge_jobs` (permanent, backup-first) |
 | **Sourcing** | `scan_portals` (Greenhouse + Ashby + Lever + Workday + Amazon + Google + generic Playwright) |
 | **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
 | **Contacts** | `add_contacts` (upsert from chat), `export_contacts` (CSV+JSON backup), `import_contacts` (merge, non-destructive), `delete_contacts` (soft-delete, recoverable) |
@@ -140,6 +140,34 @@ tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all load
 > checks as the `npx job_ops-mcp doctor` CLI command) covering packet ↔ cv.md sync state,
 > LLM provider/key, sampling + auth posture, active template, modes, visa scoring, and the
 > public base URL. Handy for "is my server wired right?" without leaving chat.
+
+---
+
+## Trash & recovery (jobs)
+
+Jobs follow the same non-destructive, recoverable, echo-before-delete philosophy as contacts
+and the career packet. **Soft-delete is the default; hard delete is always explicit, confirmed,
+and backup-first.**
+
+- **`delete_jobs`** moves 1..N jobs to the **trash** (by `job_ids` and/or by `statuses` — e.g.
+  trash everything in `skip`/`discard`/`sourced`). Trashed jobs drop out of the tracker,
+  `get_top_jobs`, and batch rating but are **retained and restorable**. It echoes exactly which
+  jobs (title + company) were trashed. This is recoverable — *not* a hard delete.
+- **`list_trashed`** shows what's currently in the trash (title, company, score, prior status,
+  when trashed) so you can review before restoring or purging.
+- **`restore_jobs`** brings trashed jobs back to their prior state.
+- **`purge_jobs`** is the only hard delete: it permanently removes **trashed** jobs (never live
+  ones). Pass `job_ids`, or `purge_all: true` (which requires `confirm: true`). A timestamped
+  backup of the affected rows is written to the project root **before** deletion; it echoes
+  exactly what was permanently removed.
+
+**In the tracker UI** (`/`): the **Status** cell is an inline dropdown (edit in place), and each
+row has a compact **Trash** button (soft-delete; the row leaves and the summary cards update
+live). A dedicated **[/trash](/trash)** page lists trashed jobs where you can **Restore** an
+item, **Delete permanently** one (with a confirm dialog), or **Empty trash** (a clearly-warned,
+irreversible hard delete — backup written regardless). UI actions hit the same `/api/*`
+endpoints that share the exact core logic the chat tools use, so a job trashed in chat shows up
+on `/trash` and vice-versa.
 
 ---
 

@@ -10,9 +10,12 @@ import express, { type Express, type Request, type Response } from 'express';
 import { resolve, normalize, relative, sep } from 'node:path';
 
 import { config } from '../config.js';
-import { renderDashboard } from './dashboard.js';
+import { renderDashboard, renderTrashPage, countsJson } from './dashboard.js';
 import { bearerAuthMiddleware, protectedResourceMetadata } from '../core/auth.js';
 import { mountElicit } from './elicit.js';
+import {
+  setJobStatus, trashJobs, restoreJobs, purgeJobs, JOB_STATUSES, type JobStatus,
+} from '../core/job_trash.js';
 
 export function buildHttpApp(): Express {
   const app = express();
@@ -58,6 +61,49 @@ export function buildHttpApp(): Express {
 
   app.get('/', (_req: Request, res: Response) => {
     res.type('html').send(renderDashboard());
+  });
+
+  // Soft-deleted ("trashed") jobs page.
+  app.get('/trash', (_req: Request, res: Response) => {
+    res.type('html').send(renderTrashPage());
+  });
+
+  // ── Tracker CRUD API — the UI calls these; they share core/job_trash.ts with the MCP
+  // tools (one implementation). All are behind the same auth guard as the dashboard. ──
+  app.get('/api/counts', (_req: Request, res: Response) => res.json(countsJson()));
+
+  app.post('/api/jobs/:id/status', async (req: Request, res: Response) => {
+    const status = String(req.body?.status ?? '');
+    if (!(JOB_STATUSES as readonly string[]).includes(status)) {
+      return res.status(400).json({ error: `invalid status "${status}"` });
+    }
+    const r = await setJobStatus(req.params.id, status as JobStatus, req.body?.note);
+    if (!r.ok) return res.status(404).json({ error: r.message });
+    return res.json(r);
+  });
+
+  app.post('/api/jobs/:id/trash', async (req: Request, res: Response) => {
+    const r = await trashJobs({ jobIds: [req.params.id] });
+    if (!r.trashed && r.results[0]?.action === 'not_found') return res.status(404).json({ error: 'job not found' });
+    return res.json(r);
+  });
+
+  app.post('/api/jobs/:id/restore', async (req: Request, res: Response) => {
+    const r = await restoreJobs([req.params.id]);
+    return res.json(r);
+  });
+
+  // Hard delete — single trashed job. Backup written inside purgeJobs.
+  app.post('/api/jobs/:id/purge', async (req: Request, res: Response) => {
+    const r = await purgeJobs({ jobIds: [req.params.id] });
+    return res.json(r);
+  });
+
+  // Hard delete — empty the whole trash. Requires explicit confirm (same as chat purge_all).
+  app.post('/api/trash/purge-all', async (req: Request, res: Response) => {
+    if (req.body?.confirm !== true) return res.status(400).json({ error: 'confirm:true required to empty the trash' });
+    const r = await purgeJobs({ all: true });
+    return res.json(r);
   });
 
   // /files/* — serve anything under outputDir. Path traversal guarded.

@@ -41,7 +41,7 @@ export const batchEvaluateTool = defineTool({
     if (!rubric || rubric.startsWith('_missing')) return errResult('modes/rubric.md missing');
 
     // Pick jobs.
-    const where: string[] = ['j.score_total IS NULL', `j.status NOT IN ('rejected','discarded','skip')`];
+    const where: string[] = ['j.trashed_at IS NULL', 'j.score_total IS NULL', `j.status NOT IN ('rejected','discarded','skip')`];
     const params: any[] = [];
     if (args.role_category) { where.push('j.role_category = ?'); params.push(args.role_category); }
     if (args.company)       { where.push('LOWER(COALESCE(c.name, j.company_name_raw)) LIKE ?'); params.push(`%${args.company.toLowerCase()}%`); }

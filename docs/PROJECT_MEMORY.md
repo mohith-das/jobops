@@ -7,13 +7,13 @@
 > generic and public-repo-safe.
 >
 > Repo: https://github.com/mohith-das/job_ops-mcp · npm: `job_ops-mcp` · License: MIT
-> Current line: **0.9.x**. Run `npm view job_ops-mcp version` for the latest.
+> Current line: **0.11.x**. Run `npm view job_ops-mcp version` for the latest.
 
 ---
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **47 tools** + **6
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **51 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -39,7 +39,8 @@ Three planes in one process:
 1. **MCP plane** — tools + resources, over **stdio** (e.g. Claude Desktop) or
    **streamable-HTTP** (e.g. LibreChat, Cursor).
 2. **HTTP plane** — a file server (`/files/*` for rendered artifacts), a tracker dashboard
-   (`/`), `/healthz`, and the `/mcp` endpoint. One port serves all of it.
+   (`/`) + soft-delete `/trash` page + `/api/*` CRUD endpoints, `/healthz`, and the `/mcp`
+   endpoint. One port serves all of it.
 3. **Data plane** — a local **SQLite** DB (WAL mode) that holds all runtime state.
 
 ### SQLite schema (overview)
@@ -91,7 +92,7 @@ directions (see §12):
 
 ---
 
-## 3. The 47 tools (grouped)
+## 3. The 51 tools (grouped)
 
 Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
 
@@ -114,9 +115,17 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 - `get_report` — fetch a saved eval report (HTML link).
 
 **Tracker**
-- `get_tracker` — pipeline view, filterable by status.
+- `get_tracker` — pipeline view, filterable by status (excludes trashed).
 - `update_status` — move a job along the lifecycle.
 - `mark_ready_to_apply` — flag a job as ready.
+- `delete_jobs` — **soft-delete (trash)** 1..N jobs by `job_ids` and/or `statuses` (e.g. all
+  `skip`/`discard`). Recoverable; trashed jobs drop out of tracker/top_jobs/batch but are
+  retained. Echoes title + company. NOT a hard delete.
+- `restore_jobs` — bring trashed jobs back to their prior state.
+- `list_trashed` — review what's in the trash (title, company, score, prior status, when trashed).
+- `purge_jobs` — **HARD delete** of trashed jobs only. `job_ids` or `purge_all: true` (needs
+  `confirm: true`). Writes a timestamped backup to the project root first; echoes what was
+  permanently removed. The only path to permanent deletion.
 
 **Sourcing**
 - `scan_portals` — poll tracked ATS endpoints (Greenhouse, Ashby, Lever, Workday, Amazon,

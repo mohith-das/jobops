@@ -7,7 +7,7 @@
 > generic and public-repo-safe.
 >
 > Repo: https://github.com/mohith-das/job_ops-mcp · npm: `job_ops-mcp` · License: MIT
-> Current line: **0.11.x**. Run `npm view job_ops-mcp version` for the latest.
+> Current line: **0.12.x**. Run `npm view job_ops-mcp version` for the latest.
 
 ---
 
@@ -115,7 +115,11 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 - `get_report` — fetch a saved eval report (HTML link).
 
 **Tracker**
-- `get_tracker` — pipeline view, filterable by status (excludes trashed).
+- `get_tracker` — filtered/paginated pipeline view (same query as the dashboard). Params:
+  `statuses[]`/`status`, `min_score`/`max_score`, `company` (contains), `role_category`,
+  `seniority`, `q` (title/company search), `sort` (score/discovered/company) + `dir`,
+  `limit`/`offset`, `show_trashed`. Returns `items` + `total_matching` (across pages) +
+  `counts_by_status` (FULL pipeline, independent of the filter). Trashed excluded by default.
 - `update_status` — move a job along the lifecycle.
 - `mark_ready_to_apply` — flag a job as ready.
 - `delete_jobs` — **soft-delete (trash)** 1..N jobs by `job_ids` and/or `statuses` (e.g. all

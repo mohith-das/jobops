@@ -59,8 +59,8 @@ export function buildHttpApp(): Express {
     });
   }
 
-  app.get('/', (_req: Request, res: Response) => {
-    res.type('html').send(renderDashboard());
+  app.get('/', (req: Request, res: Response) => {
+    res.type('html').send(renderDashboard(req.query as Record<string, unknown>));
   });
 
   // Soft-deleted ("trashed") jobs page.

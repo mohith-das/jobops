@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.11.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.12.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -757,7 +757,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 \subsection*{Tracker}
 
 \begin{description}[leftmargin=0pt]
-\item[\tool{get\_tracker}] Full pipeline snapshot as JSON. Optional \texttt{status} filter. Mirrors the dashboard at \texttt{/}.
+\item[\tool{get\_tracker}] Filtered/paginated pipeline view as JSON \textemdash{} the same query that powers the dashboard at \texttt{/} (shared \fpath{core/tracker\_query.ts}). Params: \texttt{statuses[]}/\texttt{status}, \texttt{min\_score}/\texttt{max\_score}, \texttt{company} (contains), \texttt{role\_category}, \texttt{seniority}, \texttt{q} (title/company search), \texttt{sort} (\texttt{score}/\texttt{discovered}/\texttt{company}) + \texttt{dir}, \texttt{limit}/\texttt{offset}, \texttt{show\_trashed}. Returns \texttt{items} + \texttt{total\_matching} (across all pages) + \texttt{counts\_by\_status} (the FULL pipeline, independent of the filter). Trashed excluded by default. e.g. \emph{``applied jobs scored over 70 with `engineer' in the title, page 2.''}
 \item[\tool{update\_status}] Move a job to a new status. Stamps \texttt{applied\_at} on the \texttt{applied} transition. Optional \texttt{note} appended to \texttt{score\_detail.status\_history}.
 \item[\tool{mark\_ready\_to\_apply}] Bulk-marks job IDs as \texttt{ready\_to\_apply}. Skips terminal-state rows.
 \item[\tool{delete\_jobs}] \textbf{Soft-delete} 1..N jobs to the trash (by \texttt{job\_ids} and/or \texttt{statuses}, e.g. all \texttt{skip}/\texttt{discard}). Recoverable; trashed jobs drop out of the tracker, \tool{get\_top\_jobs}, and batch rating but are retained. Echoes title + company. Never a hard delete.
@@ -768,6 +768,10 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 
 \begin{tipbox}[Trash workflow — chat + UI, one shared implementation]
 Soft-delete is the default destructive action everywhere; hard removal is always explicit, confirmed, and backup-first. In the tracker UI (\texttt{/}) the \textbf{Status} cell is an inline dropdown and each row has a \textbf{Trash} button; the dedicated \texttt{/trash} page lists trashed jobs with \emph{Restore}, per-item \emph{Delete permanently} (confirm), and \emph{Empty trash} (confirm + backup). The UI calls \texttt{/api/*} endpoints that share the exact \fpath{core/job\_trash.ts} logic the chat tools use \textemdash{} so a job trashed in chat appears on \texttt{/trash} and vice-versa.
+\end{tipbox}
+
+\begin{tipbox}[Tracker filtering, search \& pagination]
+At 1000+ jobs the dashboard paginates \emph{server-side} (SQL \texttt{WHERE}/\texttt{LIMIT}/\texttt{OFFSET} + \texttt{COUNT} \textemdash{} it never ships every row). Combinable filters (multi-status, min/max score, company-contains, role, seniority, show-trashed), debounced title/company search, sortable Score/Company/Discovered headers, and a page-size selector (25/50/100). All state lives in the URL query string (\texttt{/?status=applied\&min\_score=70\&q=engineer\&page=2}) so a view is shareable and survives refresh. The summary cards stay \textbf{true full-pipeline totals}, independent of the active filter/page. The same \fpath{core/tracker\_query.ts} backs \tool{get\_tracker}, so chat can request the same slices.
 \end{tipbox}
 
 \subsection*{Outreach}

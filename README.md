@@ -171,6 +171,31 @@ on `/trash` and vice-versa.
 
 ---
 
+## Filtering, search & pagination (tracker)
+
+At 1000+ jobs the tracker doesn't ship every row to the browser — it **paginates server-side**
+(SQL `WHERE`/`LIMIT`/`OFFSET` + a `COUNT`, never in-memory). The dashboard at `/` has:
+
+- **Filters (combinable):** multi-select **status**, **min/max score**, **company** (contains,
+  with a datalist of present companies), **role** and **seniority**, and a **show trashed** toggle.
+- **Search:** debounced, case-insensitive substring on **title or company**.
+- **Pagination:** page-size selector (25/50/100, default 50), first/prev/next/last + jump-to-page,
+  and a "N matching · showing X–Y" indicator.
+- **Sort:** click the **Score / Company / Discovered** headers (default score ↓).
+- **Shareable URLs:** every filter/sort/page is in the query string
+  (`/?status=applied&min_score=70&q=engineer&sort=score&page=2`) — bookmarkable and survives refresh.
+- **The summary cards stay TRUE TOTALS** — the whole active pipeline, independent of the current
+  filter/page. Inline status edits and trashing keep working within a filtered/paged view (the
+  row updates/leaves and counts refresh without losing your place).
+
+The **same query powers the `get_tracker` MCP tool**, so chat can ask for slices too — e.g.
+*"show me applied jobs scored over 70 with 'engineer' in the title."* `get_tracker` accepts
+`statuses[]`, `min_score`/`max_score`, `company`, `role_category`, `seniority`, `q`, `sort`,
+`dir`, `limit`, `offset`, and `show_trashed`, and returns `items` + `total_matching` +
+full-pipeline `counts_by_status`.
+
+---
+
 ## Scoring without an LLM key — IF your client supports MCP sampling
 
 The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) can run on your

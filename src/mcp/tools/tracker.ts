@@ -9,6 +9,7 @@ import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { fileUrl, trackerUrl } from '../../core/links.js';
 import { JOB_STATUSES, setJobStatus } from '../../core/job_trash.js';
+import { queryTracker, pipelineCounts } from '../../core/tracker_query.js';
 
 // Canonical lifecycle states (the CHECK on jobs.status is the hard guard). Shared with the
 // trash/UI logic via core/job_trash.ts so there's one list.
@@ -69,42 +70,42 @@ export const getTopJobsTool = defineTool({
 export const getTrackerTool = defineTool({
   name: 'get_tracker',
   title: 'Tracker view (JSON)',
-  description: 'Full pipeline snapshot as JSON. Optional `status` filter. Mirrors what the dashboard at / shows.',
+  description:
+    'Filtered/paginated pipeline snapshot — the same query that powers the dashboard at /. '
+    + 'Combine status(es), score range, company/title search, role/seniority, sort, and limit/offset '
+    + '(e.g. "applied jobs scored over 70, page 2"). counts_by_status is always the FULL pipeline '
+    + '(trashed excluded), independent of the filter. Trashed jobs are excluded unless show_trashed.',
   inputSchema: {
-    status: z.enum(STATUSES).optional(),
-    limit:  z.number().int().min(1).max(500).default(100),
+    status:        z.enum(STATUSES).optional().describe('Single-status filter (back-compat).'),
+    statuses:      z.array(z.enum(STATUSES)).optional().describe('Multi-status filter (status IN ...).'),
+    min_score:     z.number().int().min(0).max(100).optional(),
+    max_score:     z.number().int().min(0).max(100).optional(),
+    company:       z.string().optional().describe('Case-insensitive contains on company name.'),
+    role_category: z.string().optional(),
+    seniority:     z.string().optional().describe('Case-insensitive contains on seniority/level.'),
+    q:             z.string().optional().describe('Case-insensitive search on title OR company.'),
+    show_trashed:  z.boolean().optional().describe('Include trashed jobs (default false).'),
+    sort:          z.enum(['score', 'discovered', 'company']).optional().describe('Default: score.'),
+    dir:           z.enum(['asc', 'desc']).optional().describe('Default: desc.'),
+    limit:         z.number().int().min(1).max(500).default(100),
+    offset:        z.number().int().min(0).optional(),
   },
   handler: async (args) => {
-    const where: string[] = ['j.trashed_at IS NULL'];
-    const params: any[] = [];
-    if (args.status) { where.push('j.status = ?'); params.push(args.status); }
-    const sql = `
-      SELECT
-        j.id AS job_id, j.title,
-        COALESCE(c.name, j.company_name_raw) AS company_name,
-        j.score_total, j.role_category, j.seniority,
-        j.location_raw AS location, j.status, j.source_url,
-        j.discovered_at, j.scored_at, j.applied_at,
-        (SELECT er.html_path FROM eval_reports er WHERE er.job_id = j.id ORDER BY er.created_at DESC LIMIT 1) AS report_html,
-        (SELECT a.resume_path FROM applications a WHERE a.job_id = j.id LIMIT 1) AS resume_path,
-        (SELECT a.cover_path  FROM applications a WHERE a.job_id = j.id LIMIT 1) AS cover_path
-      FROM jobs j LEFT JOIN companies c ON c.id = j.company_id
-      WHERE ${where.join(' AND ')}
-      ORDER BY datetime(j.discovered_at) DESC LIMIT ?
-    `;
-    const rows = getDb().prepare(sql).all(...params, args.limit) as any[];
-    const counts = getDb().prepare(`SELECT status, COUNT(*) AS n FROM jobs WHERE trashed_at IS NULL GROUP BY status`).all() as any[];
+    const statuses = args.statuses ?? (args.status ? [args.status] : undefined);
+    const r = queryTracker({
+      statuses, min_score: args.min_score, max_score: args.max_score,
+      company: args.company, role_category: args.role_category, seniority: args.seniority,
+      q: args.q, show_trashed: args.show_trashed, sort: args.sort, dir: args.dir,
+      limit: args.limit, offset: args.offset,
+    });
     return okResult({
-      counts_by_status: Object.fromEntries(counts.map(c => [c.status, c.n])),
-      filtered_count:   rows.length,
+      counts_by_status: pipelineCounts(),
+      total_matching:   r.total,        // across all pages (for the current filter)
+      filtered_count:   r.items.length, // this page
+      limit:            r.limit,
+      offset:           r.offset,
       tracker_url:      trackerUrl(),
-      items: rows.map(r => ({
-        ...r,
-        report_url: r.report_html ? fileUrl(r.report_html) : null,
-        resume_url: r.resume_path ? fileUrl(r.resume_path) : null,
-        cover_url:  r.cover_path  ? fileUrl(r.cover_path)  : null,
-        report_html: undefined, resume_path: undefined, cover_path: undefined,
-      })),
+      items: r.items,
     });
   },
 });

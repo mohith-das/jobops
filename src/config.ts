@@ -28,7 +28,22 @@ export interface AppConfig {
   projectRoot:  string;   // where cv.md, config/profile.yml, portals.yml live
   dataDir:      string;
   outputDir:    string;
+  /**
+   * Where behavior-shaping mode files are READ from by default. Mirrors
+   * `bundledModesDir` for back-compat — most callers should go through the
+   * loader in `core/modes.ts`, which checks `userModesDir` (project root)
+   * first and falls back here. Kept so any caller that imported `modesDir`
+   * keeps resolving to the bundled defaults.
+   */
   modesDir:     string;
+  /** Bundled (read-only) mode files shipped inside the package install. */
+  bundledModesDir: string;
+  /**
+   * User-editable mode files under `<projectRoot>/modes/`. `init` scaffolds the
+   * bundled defaults into here; the loader prefers a file here over the bundled
+   * one. The directory may not exist (older project roots) — callers must guard.
+   */
+  userModesDir: string;
   templatesDir: string;
   fontsDir:     string;
   dbPath:       string;
@@ -95,8 +110,12 @@ export function loadConfig(): AppConfig {
     : process.cwd();
   const dataDir   = abs(process.env.MCP_JSA_DATA_DIR   || './data',   projectRoot);
   const outputDir = abs(process.env.MCP_JSA_OUTPUT_DIR || './output', projectRoot);
-  // modes/templates/fonts ship with the package — always read from installDir.
-  const modesDir     = resolve(installDir, 'modes');
+  // templates/fonts ship with the package — always read from installDir.
+  // modes also ship bundled, but `init` scaffolds an editable copy into
+  // <projectRoot>/modes/ and the loader prefers that copy (see core/modes.ts).
+  const bundledModesDir = resolve(installDir, 'modes');
+  const userModesDir    = resolve(projectRoot, 'modes');
+  const modesDir     = bundledModesDir;   // back-compat alias → bundled defaults
   const templatesDir = resolve(installDir, 'templates');
   const fontsDir     = resolve(installDir, 'fonts');
   const dbPath = resolve(dataDir, 'mcp-jsa.db');
@@ -116,6 +135,8 @@ export function loadConfig(): AppConfig {
     dataDir,
     outputDir,
     modesDir,
+    bundledModesDir,
+    userModesDir,
     templatesDir,
     fontsDir,
     dbPath,

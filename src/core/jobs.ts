@@ -1,7 +1,9 @@
 // Thin repo around jobs + companies. Used by every tool that touches a job row.
 import { randomUUID } from 'node:crypto';
+import type Database from 'better-sqlite3';
 import { getDb, runInWriteLock } from '../db.js';
 import { contentHash } from './content_hash.js';
+import { normalizeCompanyName, canonicalCompanyName } from './company_match.js';
 import type { NormalizedJD } from './jd_normalize.js';
 
 export interface JobRow {
@@ -34,24 +36,80 @@ export interface JobRow {
 
 // ── Companies ────────────────────────────────────────────────────────────────
 
-function normalizeCompanyName(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-export function upsertCompany(name: string): string {
+/**
+ * Resolve a company name to a stable companies.id, creating the row on first sight.
+ * Matching is fuzzy so legal-name variants collapse onto one row:
+ *   1. exact match on name_normalized (lowercased, whitespace-collapsed);
+ *   2. else match on the canonical key (legal suffixes / punctuation stripped) via
+ *      the company_aliases table — this is what makes "ANTHROPIC PBC", "Anthropic",
+ *      and "Anthropic, Inc." all land on the same row regardless of insert order;
+ *   3. else insert a new company.
+ * Every resolved variant is recorded in company_aliases (canonical key + the
+ * source-tagged variant) so future lookups are O(1) and the provenance is auditable.
+ *
+ * `opts.source` tags where the variant came from ('linkedin', 'h1b', 'jd', …).
+ */
+export function upsertCompany(name: string, opts: { source?: string } = {}): string {
+  const display    = (name ?? '').trim();
   const normalized = normalizeCompanyName(name);
   if (!normalized) throw new Error('upsertCompany: empty company name');
+  const canonical = canonicalCompanyName(name) || normalized;
   const db = getDb();
+
+  // 1. exact normalized match.
   const existing = db
     .prepare('SELECT id FROM companies WHERE name_normalized = ?')
     .get(normalized) as { id: string } | undefined;
-  if (existing) return existing.id;
+  if (existing) {
+    recordCompanyAliases(db, existing.id, display, normalized, canonical, opts.source);
+    return existing.id;
+  }
+
+  // 2. canonical (fuzzy) match via the alias index.
+  const aliasHit = db
+    .prepare('SELECT company_id AS id FROM company_aliases WHERE alias_normalized = ? LIMIT 1')
+    .get(canonical) as { id: string } | undefined;
+  if (aliasHit) {
+    recordCompanyAliases(db, aliasHit.id, display, normalized, canonical, opts.source);
+    return aliasHit.id;
+  }
+
+  // 3. new company.
   const id = randomUUID();
   db.prepare(`
     INSERT INTO companies (id, name, name_normalized)
     VALUES (?, ?, ?)
-  `).run(id, name.trim(), normalized);
+  `).run(id, display, normalized);
+  recordCompanyAliases(db, id, display, normalized, canonical, opts.source);
   return id;
+}
+
+/**
+ * Record the canonical fuzzy key (so later variants resolve here) plus, when it adds
+ * information, the source-tagged variant. INSERT OR IGNORE because UNIQUE(alias_normalized,
+ * source) means a canonical key already owned by another company is left untouched —
+ * but step 2 of upsertCompany would have matched that owner first, so we never reach here
+ * for a genuine collision.
+ */
+function recordCompanyAliases(
+  db: Database.Database,
+  companyId: string,
+  display: string,
+  normalized: string,
+  canonical: string,
+  source?: string,
+): void {
+  const ins = db.prepare(`
+    INSERT OR IGNORE INTO company_aliases (id, company_id, alias, alias_normalized, source)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  // The canonical key is the primary fuzzy index.
+  ins.run(randomUUID(), companyId, display || canonical, canonical, 'canonical');
+  // Keep the exact variant under its source for provenance when it carries more than
+  // the canonical key already does.
+  if (source && normalized && normalized !== canonical) {
+    ins.run(randomUUID(), companyId, display || normalized, normalized, source);
+  }
 }
 
 // ── Jobs ─────────────────────────────────────────────────────────────────────
@@ -72,7 +130,7 @@ export interface UpsertJobResult { id: string; created: boolean; }
 export async function upsertJob(input: UpsertJobInput): Promise<UpsertJobResult> {
   return runInWriteLock<UpsertJobResult>(() => {
     const db = getDb();
-    const company_id = upsertCompany(input.company_name);
+    const company_id = upsertCompany(input.company_name, { source: 'jd' });
     const hash = contentHash({
       company: input.company_name,
       title:   input.title,
@@ -138,15 +196,35 @@ export function getJobWithCompany(id: string): JobWithCompany | null {
   `).get(id) as JobWithCompany | undefined) ?? null;
 }
 
-// Company lookup that tolerates name variations — normalized exact match, then LIKE.
+// Company lookup that tolerates name variations. Read-only (never inserts):
+//   1. exact name_normalized match;
+//   2. canonical (legal-suffix-stripped) match via the company_aliases index — so
+//      visa_signal("ANTHROPIC PBC") finds the same row as a JD scraped as "Anthropic";
+//   3. LIKE substring fallback (original behaviour) for partial queries.
 export function findCompanyByName(query: string): { id: string; name: string } | null {
-  const normalized = query.toLowerCase().trim();
-  return (getDb().prepare(`
-    SELECT id, name FROM companies
-    WHERE name_normalized = ? OR LOWER(name) LIKE ?
-    ORDER BY (name_normalized = ?) DESC
+  const db = getDb();
+  const normalized = normalizeCompanyName(query);
+  if (!normalized) return null;
+
+  const exact = db.prepare('SELECT id, name FROM companies WHERE name_normalized = ?')
+    .get(normalized) as { id: string; name: string } | undefined;
+  if (exact) return exact;
+
+  const canonical = canonicalCompanyName(query) || normalized;
+  const viaAlias = db.prepare(`
+    SELECT c.id, c.name FROM company_aliases a
+    JOIN companies c ON c.id = a.company_id
+    WHERE a.alias_normalized = ?
     LIMIT 1
-  `).get(normalized, `%${normalized}%`, normalized) as { id: string; name: string } | undefined) ?? null;
+  `).get(canonical) as { id: string; name: string } | undefined;
+  if (viaAlias) return viaAlias;
+
+  return (db.prepare(`
+    SELECT id, name FROM companies
+    WHERE LOWER(name) LIKE ?
+    ORDER BY length(name) ASC
+    LIMIT 1
+  `).get(`%${normalized}%`) as { id: string; name: string } | undefined) ?? null;
 }
 
 export function getJobCompanyName(id: string): string | null {

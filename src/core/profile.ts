@@ -18,6 +18,7 @@ import yaml from 'js-yaml';
 
 import { config } from '../config.js';
 import { getDb, runInWriteLock } from '../db.js';
+import { resolveModePath } from './modes.js';
 import { parseCV, type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -37,6 +38,20 @@ export interface Profile {
   narrative?:    unknown;
   compensation?: unknown;
   location?:     unknown;
+  /**
+   * Optional map of target archetype → one-line tagline. When present, `reseed`
+   * auto-populates Section 2 (tagline alternatives) of the career packet from
+   * these instead of leaving the <…> placeholders that must be re-stamped by
+   * hand each reseed. Accepted shapes (both normalize to the same thing):
+   *   taglines:
+   *     "Builder PM": "ships product with engineering teeth"
+   *     "Applied AI Engineer": "..."
+   * or a list:
+   *   taglines:
+   *     - { archetype: "Builder PM", tagline: "..." }
+   * Absent → Section 2 is left exactly as the template ships (back-compat).
+   */
+  taglines?:     Record<string, string> | Array<{ archetype?: string; name?: string; tagline?: string }>;
   cv?:           { output_format?: 'html' | 'latex' };
   language?:     { modes_dir?: string };
 }
@@ -199,11 +214,21 @@ interface BuildResult {
 
 function buildPacketContent(): BuildResult {
   const { cvMd, profile } = loadProjectFiles();
-  const templatePath = resolve(config.modesDir, 'career_packet.md');
+  // Prefer the user-edited modes/career_packet.md (project root) over the bundled default.
+  const templatePath = resolveModePath('career_packet.md').path;
   let content = readIfExists(templatePath) ?? '# Career Packet (empty template)';
 
   // Always inject identity from profile.yml into Section 1.
   content = replaceSectionBody(content, '1.', renderIdentityBlock(profile));
+
+  // Section 2 — tagline alternatives. If profile.yml declares per-archetype
+  // taglines, auto-fill them so the user doesn't have to re-stamp Section 2 by
+  // hand on every reseed. When the field is absent we leave Section 2 exactly as
+  // the template ships (back-compat).
+  const taglines = normalizeTaglines(profile?.taglines);
+  if (taglines.length) {
+    content = replaceSectionBody(content, '2.', renderTaglines(taglines));
+  }
 
   let sectionsWithContent = 0;
   if (cvMd) {
@@ -298,6 +323,46 @@ function renderIdentityBlock(profile: Profile | null): string {
   if (c.github)       lines.push(`- **GitHub:** ${c.github}`);
   if (c.twitter)      lines.push(`- **Twitter:** ${c.twitter}`);
   return lines.length ? lines.join('\n') : '_Profile present but no candidate fields filled._';
+}
+
+/**
+ * Coerce the two accepted `taglines` shapes (map or list) into an ordered list of
+ * { archetype, tagline } pairs, dropping anything without both fields. Map insertion
+ * order is preserved (js-yaml keeps key order). Returns [] for absent/empty input so
+ * callers can fall back to the template's Section 2.
+ */
+export function normalizeTaglines(
+  raw: Profile['taglines'] | undefined | null,
+): Array<{ archetype: string; tagline: string }> {
+  if (!raw) return [];
+  const out: Array<{ archetype: string; tagline: string }> = [];
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const archetype = String(item.archetype ?? item.name ?? '').trim();
+      const tagline   = String(item.tagline ?? '').trim();
+      if (archetype && tagline) out.push({ archetype, tagline });
+    }
+  } else if (typeof raw === 'object') {
+    for (const [archetype, tagline] of Object.entries(raw)) {
+      const a = String(archetype).trim();
+      const t = typeof tagline === 'string' ? tagline.trim() : '';
+      if (a && t) out.push({ archetype: a, tagline: t });
+    }
+  }
+  return out;
+}
+
+function renderTaglines(taglines: Array<{ archetype: string; tagline: string }>): string {
+  const intro =
+    'The job rater picks ONE based on detected `role_category`. Auto-filled from ' +
+    '`config/profile.yml` → `taglines` on the last reseed.';
+  const lines = taglines.map(({ archetype, tagline }) => {
+    // Strip surrounding quotes the user may have wrapped the tagline in.
+    const clean = tagline.replace(/^["']|["']$/g, '');
+    return `- **${archetype}** — "${clean}"`;
+  });
+  return `${intro}\n\n${lines.join('\n')}`;
 }
 
 function renderRoleSection(exp: ExperienceItem): string {

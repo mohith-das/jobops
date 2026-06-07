@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.6.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.7.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -1117,7 +1117,9 @@ Every behaviour-shaping piece is a Markdown file or a config entry. No code chan
 
 \subsection*{Editing the modes}
 
-The six files in \fpath{modes/} are exposed as MCP resources and live-reloaded on edit (the server watches the directory). After saving, the chat picks up the change on the next \texttt{resources/read} \textemdash{} no restart.
+\texttt{init} scaffolds the six mode files into \fpath{<project-root>/modes/} (alongside \fpath{cv.md} / \fpath{config/profile.yml} / \fpath{portals.yml}) so they're yours to edit \textemdash{} you never touch the package install. The loader reads your project-root copy \emph{first} and falls back to the bundled default for any file you haven't overridden. A re-\texttt{init} never clobbers an edited copy: it warns and keeps your edits. \tool{doctor} reports which mode files are user-overridden versus bundled defaults.
+
+These files are exposed as MCP resources and live-reloaded on edit (the server watches both the project-root and bundled directories). After saving, the chat picks up the change on the next \texttt{resources/read} \textemdash{} no restart.
 
 \begin{center}
 \small
@@ -1134,6 +1136,23 @@ The six files in \fpath{modes/} are exposed as MCP resources and live-reloaded o
 \bottomrule
 \end{tabularx}
 \end{center}
+
+\subsection*{Per-archetype taglines}
+
+Section 2 of the career packet is a set of one-line positioning statements \textemdash{} one per role archetype you target \textemdash{} from which the rater picks the best fit per JD. Rather than re-stamp those by hand after every reseed, declare them once in \fpath{config/profile.yml} under a \texttt{taglines:} block:
+
+\begin{lstlisting}[language=yaml]
+taglines:
+  "Builder PM":          "ships product with engineering teeth"
+  "Applied AI Engineer": "turns LLM prototypes into shipped systems"
+  "Forward-Deployed":    "embeds with customers and closes the deal"
+\end{lstlisting}
+
+On the next \texttt{reseed} (CLI \texttt{npx job\_ops-mcp reseed} or the \tool{reseed\_career\_packet} tool) these auto-populate Section 2 \textemdash{} one bullet per archetype. The field is backwards-compatible: omit it entirely and Section 2 keeps the editable template placeholders exactly as before.
+
+\subsection*{Company alias / fuzzy matching}
+
+Company names arrive in different legal forms across data sources \textemdash{} a LinkedIn connection at ``Anthropic'', an H1B filing under ``ANTHROPIC PBC'', a JD scraped as ``Anthropic, Inc.''. The server normalizes all of them by stripping common legal suffixes (\texttt{Inc, LLC, PBC, Ltd, Corp, Co, GmbH}, \dots), lowercasing, and trimming punctuation, then matches on that canonical key. The result: all three resolve to the \emph{same} \texttt{companies} row, so the \texttt{company\_id} joins that \tool{find\_warm\_intros} and \tool{visa\_signal} depend on actually line up. This applies consistently to \tool{import\_linkedin}, \tool{import\_h1b}, JD ingestion, and \tool{visa\_signal}. Resolved variants are recorded in the \texttt{company\_aliases} table for provenance.
 
 \subsection*{Disabling visa scoring (fully optional)}
 

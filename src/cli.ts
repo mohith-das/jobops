@@ -81,6 +81,29 @@ async function cmdInit(flags: Map<string, string | boolean>) {
     scaffolded++;
   }
 
+  // Scaffold the behavior-shaping mode files into <projectRoot>/modes/ so they're
+  // user-editable (like cv.md / profile.yml). Idempotent: an existing (likely edited)
+  // copy is never overwritten — we warn instead. The loader prefers these over the
+  // bundled defaults (see core/modes.ts).
+  const { MODE_FILES } = await import('./core/modes.js');
+  const modesSrcDir = resolve(PACKAGE_ROOT, 'modes');
+  const modesDstDir = resolve(cwd, 'modes');
+  console.log('');
+  for (const file of MODE_FILES) {
+    const srcAbs = resolve(modesSrcDir, file);
+    const dstAbs = resolve(modesDstDir, file);
+    if (!existsSync(srcAbs)) { console.log(`  ${cross()} bundled mode missing: modes/${file}`); continue; }
+    if (existsSync(dstAbs)) {
+      console.log(`  ${warn()} modes/${file} already exists — keeping your edits (not overwriting)`);
+      kept++;
+      continue;
+    }
+    mkdirSync(modesDstDir, { recursive: true });
+    copyFileSync(srcAbs, dstAbs);
+    console.log(`  ${tick()} scaffolded modes/${file}`);
+    scaffolded++;
+  }
+
   // Run migrations by importing db.ts — getDb() applies pending migrations on first open.
   // Set MCP_JSA_PROJECT_ROOT to cwd BEFORE config.ts gets imported so the data dir lives
   // next to the user's cv.md / profile.yml, not inside the package install.
@@ -118,6 +141,7 @@ async function cmdInit(flags: Map<string, string | boolean>) {
 
   console.log(c.bold('\nNext steps:'));
   console.log(`  1. Edit ${c.bold('cv.md')}, ${c.bold('config/profile.yml')}, and ${c.bold('portals.yml')} — replace every <TODO> placeholder.`);
+  console.log(`     ${c.dim('Optional: tune the behavior in modes/*.md (rubric, tailoring rules, outreach tone) — your edits win over the bundled defaults.')}`);
   console.log(`  2. Run ${c.bold('npx job_ops-mcp doctor')} to confirm everything is wired.`);
   console.log(`  3. Run ${c.bold('npx job_ops-mcp start')} to boot the server.`);
   console.log(`  4. Run ${c.bold('npx job_ops-mcp connect')} for Claude Desktop config.\n`);
@@ -226,6 +250,26 @@ async function cmdDoctor() {
     }
   } catch (e: any) {
     console.log(`  ${warn()} templates check failed: ${e?.message ?? e}`);
+  }
+
+  // 5a-bis. Mode files — report which are user-overridden (project root) vs bundled.
+  try {
+    const { MODE_FILES, modeSource } = await import('./core/modes.js');
+    const sources = MODE_FILES.map(f => ({ f, src: modeSource(f) }));
+    const overridden = sources.filter(s => s.src === 'user').map(s => s.f.replace(/\.md$/, ''));
+    const missing    = sources.filter(s => s.src === 'missing').map(s => s.f);
+    if (missing.length) {
+      console.log(`  ${cross()} mode file(s) missing entirely: ${missing.join(', ')} — reinstall the package.`);
+      failures++;
+    }
+    if (overridden.length) {
+      const rest = overridden.length < MODE_FILES.length ? '; rest bundled defaults' : '';
+      console.log(`  ${tick()} modes: ${overridden.length}/${MODE_FILES.length} user-overridden (${overridden.join(', ')})${rest}`);
+    } else {
+      console.log(`  ${tick()} modes: all bundled defaults — edit ${c.bold('modes/*.md')} in your project root to customize (init scaffolds them)`);
+    }
+  } catch (e: any) {
+    console.log(`  ${warn()} modes check failed: ${e?.message ?? e}`);
   }
 
   // 5b. Public base URL — informational, never a failure.

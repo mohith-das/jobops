@@ -26,6 +26,18 @@ target_roles:
     - { name: "<archetype label, e.g. Technical PM>",   level: "Senior/Staff",fit: "secondary" }
     - { name: "<archetype label, e.g. Forward-Deployed>",level: "Mid-Senior", fit: "adjacent"  }
 
+# Per-archetype taglines. Optional but recommended.
+# On `reseed` (CLI `npx job_ops-mcp reseed` or the reseed_career_packet tool) these
+# auto-populate Section 2 (tagline alternatives) of the career packet — one bullet per
+# archetype — so you never have to re-stamp them by hand. The job rater picks ONE per
+# JD based on the detected role_category. Key = archetype label (match your
+# `target_roles.archetypes[].name`); value = the one-line positioning.
+# Omit this whole block and Section 2 keeps the editable <…> template placeholders.
+taglines:
+  "Builder PM":          "ships product with engineering teeth — PRD to prod, no hand-holding"
+  "Applied AI Engineer": "turns LLM prototypes into evaluated, shipped systems"
+  "Forward-Deployed":    "embeds with customers and delivers the integration that closes the deal"
+
 narrative:
   # One-line professional headline.
   headline:   "<your one-line headline>"

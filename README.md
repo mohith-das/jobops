@@ -15,10 +15,11 @@ back as an `http://localhost:7891/...` link.
 ## Quickstart
 
 ```bash
-# 1. Scaffold your working directory (cv.md, profile.yml, portals.yml + SQLite DB)
+# 1. Scaffold your working directory (cv.md, profile.yml, portals.yml, modes/*.md + SQLite DB)
 npx job_ops-mcp init
 
 # 2. Open cv.md, config/profile.yml, portals.yml and replace every <TODO> placeholder.
+#    (Optional: tune modes/*.md — rubric, tailoring rules, outreach tone — your edits win.)
 
 # 3. Rebuild the career_packet from your now-real cv.md
 #    (or just re-run `init` — it auto-reseeds when it detects cv.md changed)
@@ -107,7 +108,11 @@ tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all load
 ## Designed to be made yours
 
 The defaults assume nothing about your location, citizenship, role, or industry. Every
-behaviour-shaping piece is a markdown file you can rewrite:
+behaviour-shaping piece is a markdown file you can rewrite. **`init` copies these into
+`<project-root>/modes/` so they're yours to edit** — the loader reads your project-root
+copy first and falls back to the bundled default, so you never touch the package install.
+A re-`init` never clobbers an edited copy (it warns and keeps your edits); `doctor` reports
+which files are user-overridden vs bundled.
 
 | You can change… | By editing… |
 |---|---|
@@ -117,6 +122,7 @@ behaviour-shaping piece is a markdown file you can rewrite:
 | Outreach tone + char caps | `modes/outreach_tone.md` |
 | Negotiation scripts + framework | `modes/negotiation_playbook.md` |
 | Your bullet/project bank | `modes/career_packet.md` (or via `update_career_packet`) |
+| Per-archetype taglines | `config/profile.yml` → `taglines:` (auto-fills career-packet Section 2 on reseed) |
 | Tracked companies + filters | `portals.yml` |
 | Identity + target roles | `config/profile.yml` |
 
@@ -421,6 +427,14 @@ import_linkedin path="/absolute/path/to/Connections.csv"
 
 Now `find_warm_intros(company="…")` returns the people you actually know who work there
 (filtered to non-recruiters, sorted by engineering / leadership weight).
+
+Company names are matched **fuzzily** so legal-name variants line up: `import_linkedin`,
+`import_h1b`, JD ingestion, `visa_signal`, and `find_warm_intros` all normalize names by
+stripping common legal suffixes (Inc, LLC, PBC, Ltd, Corp, Co, GmbH, …), lowercasing, and
+trimming punctuation. So a LinkedIn connection at "Anthropic", an H1B filing under
+"ANTHROPIC PBC", and a JD scraped as "Anthropic, Inc." all resolve to the **same company
+row** — which is what makes warm-intro and visa-signal joins actually work. Resolved
+variants are recorded in the `company_aliases` table.
 
 ### Importing DOL OFLC H1B data → visa-friendliness signal
 

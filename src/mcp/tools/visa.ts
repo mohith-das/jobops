@@ -118,7 +118,7 @@ export const importLinkedinTool = defineTool({
           const is_leadership  = /(chief|founder|ceo|cto|cpo|cmo|vp|director|head of|principal)/i.test(lower) ? 1 : 0;
           let company_id: string | null = null;
           if (company) {
-            try { company_id = upsertCompany(company); } catch { /* ignore */ }
+            try { company_id = upsertCompany(company, { source: 'linkedin' }); } catch { /* ignore */ }
           }
           const existing = existsStmt.get(url) as { id: string } | undefined;
           if (existing) {
@@ -188,7 +188,7 @@ export const importH1bTool = defineTool({
           if (!caseNum) { skipped++; continue; }
           const employerRaw = get(r, 'EMPLOYER_NAME', 'Employer Name');
           let employerId: string | null = null;
-          if (employerRaw) { try { employerId = upsertCompany(employerRaw); matched_company++; } catch {} }
+          if (employerRaw) { try { employerId = upsertCompany(employerRaw, { source: 'h1b' }); matched_company++; } catch {} }
           insertStmt.run(
             caseNum,
             get(r, 'CASE_STATUS', 'Case Status') || 'Unknown',

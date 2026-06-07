@@ -272,6 +272,34 @@ async function cmdDoctor() {
     console.log(`  ${warn()} modes check failed: ${e?.message ?? e}`);
   }
 
+  // 5a-ter. Auth posture — report whether the PII surface is protected.
+  try {
+    const { config: cfg } = await import('./config.js');
+    const p = cfg.authPolicy;
+    if (p.mode === 'open') {
+      console.log(`  ${tick()} auth: open (localhost-only bind — frictionless, no token). ${c.dim('PII stays on 127.0.0.1.')}`);
+      console.log(`         ${c.dim('To expose remotely, set MCP_JSA_HOST + MCP_JSA_AUTH_TOKEN (required).')}`);
+    } else if (p.mode === 'token') {
+      console.log(`  ${tick()} auth: bearer token required on /mcp, /files, dashboard ${c.dim(p.isLocalhost ? '(localhost + token)' : '(remote bind — PII protected)')}`);
+    } else {
+      console.log(`  ${cross()} auth: DENY — ${p.reason}`);
+      console.log(`         Fix: ${c.bold('export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"')} before exposing beyond localhost.`);
+      failures++;
+    }
+  } catch { /* config never throws — defensive */ }
+
+  // 5a-quater. Sampling vs BYO key — how api-path scoring will run. Read the resolved
+  // config flag (not a re-parse of the env var) so doctor and the runtime never disagree.
+  try {
+    const { config: cfg } = await import('./config.js');
+    if (cfg.samplingEnabled) {
+      console.log(`  ${tick()} scoring: MCP sampling preferred over stdio (client model — no key); BYO key is the fallback`);
+      console.log(`         ${c.dim('sampling/elicitation need a stdio client (e.g. Claude Desktop); HTTP clients use the fallback paths.')}`);
+    } else {
+      console.log(`  ${warn()} scoring: sampling disabled (MCP_JSA_SAMPLING=false) — api paths require a BYO LLM key`);
+    }
+  } catch { /* config never throws */ }
+
   // 5b. Public base URL — informational, never a failure.
   try {
     const { config: cfg } = await import('./config.js');

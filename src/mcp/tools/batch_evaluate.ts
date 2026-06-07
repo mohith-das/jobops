@@ -8,9 +8,9 @@ import { z } from 'zod';
 import { config } from '../../config.js';
 import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
-import { chatLogged, llmAvailable } from '../../core/llm.js';
 import { getMode } from '../../core/modes.js';
 import { combineNoVisa } from '../../core/reports.js';
+import { pickCompleter, type Completer } from '../../core/scoring.js';
 
 const ROLE_CATEGORIES = ['pm','ml_eng','data_eng','analytics_eng','swe','forward_deployed','other'] as const;
 
@@ -18,17 +18,24 @@ export const batchEvaluateTool = defineTool({
   name: 'batch_evaluate',
   title: 'Batch-rate unrated jobs via LLM',
   description:
-    'api path. Selects unrated jobs (score_total IS NULL) matching the optional filter and rates each via the configured ' +
-    'LLM (Gemini default / DeepSeek). Returns an A-F tier distribution and any parse-error count. Never produces silent zeros.',
+    'Selects unrated jobs (score_total IS NULL) matching the optional filter and rates each. ' +
+    'Prefers MCP sampling (your connected client\'s model — no API key needed); falls back to a ' +
+    'BYO LLM key (Gemini/DeepSeek) when the client does not support sampling. Returns an A-F tier ' +
+    'distribution and any parse-error count. Never produces silent zeros.',
   inputSchema: {
     role_category: z.enum(ROLE_CATEGORIES).optional(),
     company:       z.string().optional().describe('Substring match on company name.'),
     limit:         z.number().int().min(1).max(500).default(50),
     concurrency:   z.number().int().min(1).max(8).default(2),
   },
-  handler: async (args) => {
-    if (!llmAvailable()) {
-      return errResult('No LLM provider configured. Set MCP_JSA_LLM_PROVIDER=gemini and GEMINI_API_KEY, or use mode=chat on evaluate_job for the manual path.');
+  handler: async (args, ctx) => {
+    const picked = pickCompleter(ctx?.bridge);
+    if (!picked) {
+      return errResult(
+        'No scoring backend available. Either: connect an MCP client that supports sampling ' +
+        '(no key needed), OR set MCP_JSA_LLM_PROVIDER=gemini with GEMINI_API_KEY, OR use ' +
+        'evaluate_job mode=chat for the manual path.',
+      );
     }
     const rubric = getMode('rubric.md');
     if (!rubric || rubric.startsWith('_missing')) return errResult('modes/rubric.md missing');
@@ -58,7 +65,7 @@ export const batchEvaluateTool = defineTool({
       while (queue.length) {
         const job = queue.shift()!;
         try {
-          const res = await rateOne(job, rubric);
+          const res = await rateOne(job, rubric, picked.completer);
           tierBump(distribution, res?.score_total);
           if (!res?.parsed) parseErrors++;
           items.push({ job_id: job.id, title: job.title, company: job.company_name,
@@ -75,19 +82,20 @@ export const batchEvaluateTool = defineTool({
     return okResult({
       rated: items.length - parseErrors,
       parse_errors: parseErrors,
+      scored_via: picked.kind,   // 'sampling' (client model, no key) or 'api' (BYO key)
       distribution,
       items: items.slice().sort((a, b) => (b.score_total ?? -1) - (a.score_total ?? -1)),
     });
   },
 });
 
-async function rateOne(job: any, rubric: string): Promise<{ parsed: any; score_total: number | null; role_category?: string }> {
+async function rateOne(job: any, rubric: string, complete: Completer): Promise<{ parsed: any; score_total: number | null; role_category?: string }> {
   const system = rubric +
     '\n\n== INSTRUCTIONS ==\nScore the JD below per the rubric. Output ONLY the strict JSON object specified in "Output contract (chat mode)". No prose outside JSON.';
   const user = `JOB title: ${job.title}\nCompany: ${job.company_name}\nLocation: ${job.location ?? ''}\n\nDESCRIPTION:\n${(job.description ?? '').slice(0, 8000)}`;
-  const call = await chatLogged('batch_evaluate', [
+  const call = await complete('batch_evaluate', [
     { role: 'system', content: system }, { role: 'user', content: user },
-  ], { responseFormat: 'json_object', temperature: 0.2, jobId: job.id });
+  ], { temperature: 0.2, jobId: job.id });
 
   if (!call.parseOk) {
     // Persist parse error — keep score_total NULL so it stays in unrated bucket for retry.

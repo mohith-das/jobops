@@ -3,6 +3,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveAuthPolicy, type AuthPolicy } from './core/auth.js';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = resolve(here, '..'); // dist/ → install root
 
@@ -98,6 +100,24 @@ export interface AppConfig {
    * missing on disk the renderer falls back to "default" with a stderr warning.
    */
   defaultTemplate: string;
+  /**
+   * Operator-provided bearer token (MCP_JSA_AUTH_TOKEN). Required to expose the
+   * server beyond localhost — see `authPolicy`. Null when unset.
+   */
+  authToken: string | null;
+  /**
+   * Resolved auth posture for the current bind host + token. When `mode === 'deny'`
+   * the server refuses to boot (default-deny for remote PII exposure).
+   */
+  authPolicy: AuthPolicy;
+  /**
+   * When true (default), api-path scoring (batch_evaluate, evaluate_job api mode)
+   * prefers MCP sampling — asking the connected client's model for completions, so
+   * no separate Gemini/DeepSeek key is needed. Falls back to the BYO-key provider
+   * when the client doesn't advertise sampling. Set MCP_JSA_SAMPLING=false to force
+   * the BYO-key path even when sampling is available.
+   */
+  samplingEnabled: boolean;
 }
 
 export function loadConfig(): AppConfig {
@@ -129,6 +149,9 @@ export function loadConfig(): AppConfig {
   const listenUrl = `http://${host}:${port}`;
   const { publicBaseUrl, publicBaseUrlIsExplicit } = resolvePublicBaseUrl(listenUrl);
 
+  const authToken  = (process.env.MCP_JSA_AUTH_TOKEN ?? '').trim() || null;
+  const authPolicy = resolveAuthPolicy({ host, token: authToken });
+
   return {
     installDir,
     projectRoot,
@@ -154,6 +177,9 @@ export function loadConfig(): AppConfig {
                           ? abs(process.env.MCP_JSA_TEMPLATE_DIR, process.cwd())
                           : null,
     defaultTemplate:    (process.env.MCP_JSA_DEFAULT_TEMPLATE || 'default').trim() || 'default',
+    authToken,
+    authPolicy,
+    samplingEnabled:    envBool('MCP_JSA_SAMPLING', true),
   };
 }
 

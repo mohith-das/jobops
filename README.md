@@ -83,7 +83,7 @@ without one.
 
 ---
 
-## Tools (36 — one MCP `tools/list` call away)
+## Tools (38 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
@@ -94,7 +94,7 @@ without one.
 | **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
 | **Interview / offer** | `extract_stories`, `get_story_bank`, `negotiation_brief` |
 | **Research** | `deep_research`, `enrich_company`, `daily_digest` |
-| **Profile + ops** | `get_career_packet`, `update_career_packet`, `cost_estimate` |
+| **Profile + ops** | `get_career_packet`, `update_career_packet`, `update_profile` (elicitation), `cost_estimate` |
 | **Apply (preview only — never submits)** | `apply_prefill` |
 | **Visa (optional, can be hidden)** | `visa_signal`, `import_h1b`, `import_linkedin` |
 | **Scheduler (opt-in cron, off by default)** | `scheduler_status`, `scheduler_enable`, `scheduler_disable` |
@@ -102,6 +102,43 @@ without one.
 Six MCP **resources** carry the editable behaviour — rubric, report_format,
 tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all loaded from
 `modes/*.md` and live-reloaded on edit. Tune scoring or tone without touching code.
+
+---
+
+## No LLM key needed (MCP sampling)
+
+The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) prefer **MCP sampling**:
+the server asks your *already-connected client's model* for the completion — same rubric,
+same strict-JSON contract — so you need **no separate Gemini/DeepSeek key**. The chat-mode
+and api-mode rating paths collapse into one sampling-based path.
+
+- **Capability- and transport-gated.** Sampling is a server→client request, so it needs a
+  transport that carries bidirectional traffic — **stdio** (e.g. Claude Desktop). The
+  stateless HTTP transport can't deliver server-initiated requests, so HTTP clients
+  **fall back automatically** to the BYO-key path (`MCP_JSA_LLM_PROVIDER` + key); if that
+  isn't configured either, `evaluate_job mode="chat"` (the default) still works — your
+  chat scores it directly. The gate checks both your client's advertised `sampling`
+  capability and the transport, so a fallback is clean (no hang).
+- **Cost.** Sampling runs on the client's model, so the cost is **borne by the client**.
+  `cost_estimate` still works: sampling calls are recorded and flagged as client-borne
+  ($0 server cost) so the total isn't misread.
+- Set `MCP_JSA_SAMPLING=false` to force the BYO-key path even when sampling is available.
+
+## Frictionless profile setup (MCP elicitation)
+
+`update_profile` uses **MCP elicitation** (form mode) so your client can collect identity
+fields + per-archetype taglines through a structured form — no hand-editing YAML. On
+accept it writes `config/profile.yml` and reseeds the career packet in one step.
+
+Sensitive inputs (your LinkedIn export path, credentials) use **URL-mode elicitation**
+(2025-11-25): the server hands you a one-time local URL where you enter the value
+directly, so it **never passes through the MCP client / chat transcript**. `import_linkedin`
+uses this when you omit `path` and your client supports it.
+
+Both are capability- and transport-gated (like sampling, elicitation is a server→client
+request that needs a stdio connection). Clients without elicitation support — and all HTTP
+clients — fall back to the file-based + argument paths (`update_profile fields=…`, edit
+`config/profile.yml`, pass `import_linkedin path=…`), which work exactly as before.
 
 ---
 
@@ -166,9 +203,11 @@ roles where sponsorship is a non-issue — turn it off; the rest of the system w
 | `MCP_JSA_TEMPLATE_DIR` | _empty_ | User-owned dir holding additional resume/cover themes — overrides bundled themes of the same name. See [Custom themes](#custom-themes) + [`TEMPLATES.md`](./TEMPLATES.md). |
 | `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` argument. |
 | `MCP_JSA_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
-| `MCP_JSA_LLM_PROVIDER` | `gemini` | Used only by `api`/batch paths: `gemini`, `deepseek`, `none` |
+| `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files/*`, and the dashboard. **Required** to bind to anything other than localhost — without it, a non-localhost bind refuses to start (default-deny). See [Security model](#security-model). |
+| `MCP_JSA_SAMPLING` | `true` | Prefer MCP sampling (the connected client's model — no API key) for `api`/batch scoring. Set `false` to force the BYO-key path. |
+| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key **fallback** for `api`/batch paths when the client can't sample: `gemini`, `deepseek`, `none` |
 | `MCP_JSA_LLM_MODEL` | _empty_ | Provider-specific model id |
-| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials |
+| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials (only needed when sampling is unavailable) |
 | `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
 
 A working starter is at `.env.example`.
@@ -310,23 +349,51 @@ export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.com"
 ```
 
 Every artifact link (resume PDF, .tex, .docx, eval report, apply_prefill screenshot,
-tracker URL) now uses that base. **No other behaviour changes** — the server still binds
-to `MCP_JSA_HOST` (default `127.0.0.1`); to actually accept connections from other
-devices, also set `MCP_JSA_HOST=0.0.0.0`. `npx job_ops-mcp doctor` prints the
-effective public base URL so you can confirm what your links will look like.
+tracker URL) now uses that base. The server still binds to `MCP_JSA_HOST` (default
+`127.0.0.1`); to accept connections from other devices, also set `MCP_JSA_HOST=0.0.0.0`
+— **which now requires `MCP_JSA_AUTH_TOKEN`** (see [Security model](#security-model)).
+`npx job_ops-mcp doctor` prints the effective public base URL and auth posture.
 
 A malformed value (e.g. `not-a-url`) is rejected at boot with a warning on stderr; the
 server keeps running with the default 127.0.0.1 base. Trailing slashes are stripped.
 
-### Security note
+---
 
-This setting **only changes the URLs the server emits in responses**. It does not add
-authentication and does not change the bind address. If you set `MCP_JSA_HOST=0.0.0.0`
-so the server accepts remote connections, the HTTP file server then serves your resume
-PDFs, cover letters, eval reports, LinkedIn-derived data, and H1B-derived data **without
-authentication** to anyone who can reach the port. Restrict access to a private network
-(Tailscale, a VPN, a reverse proxy with auth) — never expose this directly on the public
-internet.
+## Security model
+
+This server handles **PII**: your resume PDFs, cover letters, eval reports, your
+LinkedIn connections, and H1B-derived employer data. The auth posture is decided entirely
+by **where you bind** and **whether a token is set**:
+
+| Bind (`MCP_JSA_HOST`) | `MCP_JSA_AUTH_TOKEN` | Result |
+|---|---|---|
+| `127.0.0.1` (default) | unset | **Open** — frictionless local use. PII stays on loopback. |
+| `127.0.0.1` | set | **Token required** — bearer auth enforced even locally (opt-in). |
+| `0.0.0.0` / LAN / Tailscale | **unset** | **Refuses to start** (default-deny). |
+| `0.0.0.0` / LAN / Tailscale | set | **Token required** — bearer auth on every PII route. |
+
+When a token is required, every PII-bearing route — the MCP endpoint (`/mcp`), the file
+server (`/files/*`), and the tracker dashboard (`/`) — demands an
+`Authorization: Bearer <token>` header. Requests without it get `401` with a
+`WWW-Authenticate` header pointing at the protected-resource metadata document
+(`/.well-known/oauth-protected-resource`). This aligns with the MCP 2025-06-18 model of
+treating the server as an **OAuth Resource Server**, to the extent practical for a
+self-hosted single-user tool: one operator-provisioned static token, no full
+authorization-server flow.
+
+```bash
+# Expose over Tailscale/LAN — generate a strong token first.
+export MCP_JSA_HOST=0.0.0.0
+export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+npx job_ops-mcp start
+```
+
+**What's protected:** `/mcp`, `/files/*`, `/`. **What's open by design:** `/healthz`
+(liveness, no PII) and the discovery metadata. **Hard rule:** PII must never be served
+unauthenticated to a network — the default-deny boot guard exists precisely so a missing
+token fails loudly instead of silently exposing your data. Still prefer a private network
+(Tailscale / VPN / authenticated reverse proxy) over the public internet.
 
 ---
 

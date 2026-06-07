@@ -21,7 +21,35 @@ export interface BootOptions {
   stdio?: boolean;
 }
 
+function authBannerLine(): string {
+  switch (config.authPolicy.mode) {
+    case 'open':  return 'open (localhost-only — no token required)';
+    case 'token': return config.authPolicy.isLocalhost
+      ? 'bearer token required (set even for localhost)'
+      : 'bearer token required (remote bind — PII protected)';
+    default:      return 'denied';
+  }
+}
+
 export async function bootServer(opts: BootOptions = {}): Promise<void> {
+  // ── Default-deny guard ───────────────────────────────────────────────────────
+  // Refuse to boot when bound to a non-localhost address without an auth token. This
+  // is the hard guarantee that resume PDFs / LinkedIn connections / H1B PII are never
+  // served unauthenticated to a remote network. stdio mode still binds the HTTP file
+  // server (for /files/* links), so the guard applies there too.
+  if (config.authPolicy.mode === 'deny') {
+    // eslint-disable-next-line no-console
+    console.error(
+      `\n[fatal] Refusing to start: ${config.authPolicy.reason}\n` +
+      `  Bind host:   ${config.host}\n` +
+      `  Fix (pick one):\n` +
+      `    • Bind to localhost only (default):  unset MCP_JSA_HOST (or set it to 127.0.0.1)\n` +
+      `    • Expose remotely WITH auth:         export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"\n` +
+      `  Never expose resume PDFs / LinkedIn / H1B data to a network without a token.\n`,
+    );
+    process.exit(1);
+  }
+
   // Migrations + first-run seeding (side-effect of getDb()).
   getDb();
   const seed = await ensureActiveCareerPacket();
@@ -52,6 +80,7 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
           `  · career_packet:  ${seed.created ? `seeded v${seed.version}` : `existing v${seed.version}`}`,
           `  · scheduler:      ${enabled.length ? enabled.join(', ') : 'off'}`,
           `  · visa scoring:   ${config.visaScoringEnabled ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`,
+          `  · auth:           ${authBannerLine()}`,
           '',
         ]
       : [
@@ -69,6 +98,7 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
           `  · career_packet:  ${seed.created ? `seeded v${seed.version}` : `existing v${seed.version}`}`,
           `  · scheduler:      ${enabled.length ? enabled.join(', ') : 'off'}`,
           `  · visa scoring:   ${config.visaScoringEnabled ? 'on (0.5/0.3/0.2)' : 'off (0.6/0.4, visa tools hidden)'}`,
+          `  · auth:           ${authBannerLine()}`,
           '',
         ];
     // eslint-disable-next-line no-console

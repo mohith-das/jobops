@@ -11,9 +11,9 @@
 // The hard rule from the brief stays intact: NOTHING in the packet is invented; every
 // bullet, project, skill, and degree comes verbatim from cv.md.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import yaml from 'js-yaml';
 
 import { config } from '../config.js';
@@ -85,6 +85,54 @@ export function loadProjectFiles(): ProjectFiles {
     }
   }
   return { cvMd, profile, portalsYml };
+}
+
+// ── Structured profile update (feeds the elicitation flow) ────────────────────
+
+export interface ProfileUpdate {
+  candidate?: Partial<NonNullable<Profile['candidate']>>;
+  /** Archetype → tagline map; merged into the existing taglines. */
+  taglines?:  Record<string, string>;
+}
+
+/**
+ * Merge structured updates into config/profile.yml and write it back. Used by the
+ * `update_profile` tool (elicitation form mode) so a user can set identity fields +
+ * taglines through their MCP client instead of hand-editing YAML.
+ *
+ * NB: this rewrites the YAML from the parsed object, so hand-written comments in
+ * profile.yml are not preserved — the data is. Empty-string values are ignored (so a
+ * blank form field never wipes an existing value). Returns the path + counts so the
+ * caller can report and decide whether to reseed.
+ */
+export function applyProfileUpdate(update: ProfileUpdate): {
+  path: string; candidate_fields_set: number; taglines_set: number;
+} {
+  const path = pathInProject('config', 'profile.yml');
+  const raw  = readIfExists(path);
+  const base: any = raw ? (yaml.load(raw) ?? {}) : {};
+
+  let candidateFieldsSet = 0;
+  if (update.candidate) {
+    base.candidate = base.candidate ?? {};
+    for (const [k, v] of Object.entries(update.candidate)) {
+      if (typeof v === 'string' && v.trim()) { base.candidate[k] = v.trim(); candidateFieldsSet++; }
+    }
+  }
+
+  let taglinesSet = 0;
+  if (update.taglines && Object.keys(update.taglines).length) {
+    base.taglines = (base.taglines && typeof base.taglines === 'object' && !Array.isArray(base.taglines))
+      ? base.taglines : {};
+    for (const [archetype, tagline] of Object.entries(update.taglines)) {
+      const a = archetype.trim(); const t = (tagline ?? '').trim();
+      if (a && t) { base.taglines[a] = t; taglinesSet++; }
+    }
+  }
+
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, yaml.dump(base, { lineWidth: 100, noRefs: true }), 'utf-8');
+  return { path, candidate_fields_set: candidateFieldsSet, taglines_set: taglinesSet };
 }
 
 // ── Staleness detection ──────────────────────────────────────────────────────

@@ -15,6 +15,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { RealClientBridge, NULL_BRIDGE, type ToolContext } from './client_bridge.js';
+
 export type ToolResult = {
   content: { type: 'text'; text: string }[];
   structuredContent?: object;
@@ -26,7 +28,10 @@ export interface ToolDef<S extends z.ZodRawShape = z.ZodRawShape> {
   title:       string;
   description: string;
   inputSchema: S;
-  handler:     (args: z.objectOutputType<S, z.ZodTypeAny>) => Promise<ToolResult> | ToolResult;
+  // The optional second arg gives a tool access to MCP sampling / elicitation via the
+  // ClientBridge. Tools that don't need it simply omit the parameter (back-compat). In
+  // tests, call `tool.handler(args, { bridge: mockBridge })` directly.
+  handler:     (args: z.objectOutputType<S, z.ZodTypeAny>, ctx?: ToolContext) => Promise<ToolResult> | ToolResult;
 }
 
 export function defineTool<S extends z.ZodRawShape>(d: ToolDef<S>): ToolDef<S> {
@@ -39,11 +44,16 @@ export function defineTool<S extends z.ZodRawShape>(d: ToolDef<S>): ToolDef<S> {
 export type AnyToolDef = ToolDef<any>;
 
 export function registerTools(server: McpServer, tools: ReadonlyArray<AnyToolDef>): void {
+  // Build the ClientBridge once, bound to this McpServer. Capabilities are read live on
+  // each call (getClientCapabilities reflects the most recent initialize), so a single
+  // bridge instance is correct across the shared server's per-request transports.
+  const bridge = server ? new RealClientBridge(server) : NULL_BRIDGE;
+  const ctx: ToolContext = { bridge };
   for (const t of tools) {
     server.registerTool(
       t.name,
       { title: t.title, description: t.description, inputSchema: t.inputSchema },
-      t.handler as any,
+      ((args: any) => t.handler(args, ctx)) as any,
     );
   }
 }

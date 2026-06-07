@@ -12,6 +12,7 @@ import { getDb, runInWriteLock } from '../../db.js';
 import { defineTool, okResult, errResult } from '../define.js';
 import { parseCsv, findLinkedinHeader, pickHeader, parseMaybeNumber, expandUserPath } from '../../core/csv.js';
 import { upsertCompany, findCompanyByName } from '../../core/jobs.js';
+import { createCapture } from '../../http/elicit.js';
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024;  // 200 MB — full DOL quarterly is < this.
 
@@ -63,13 +64,45 @@ export const visaSignalTool = defineTool({
 export const importLinkedinTool = defineTool({
   name: 'import_linkedin',
   title: 'Import a LinkedIn Connections.csv export',
-  description: 'Bulk-loads linkedin_connections from the standard LinkedIn export (Settings → Data Privacy → Export your data → Connections).',
+  description:
+    'Bulk-loads linkedin_connections from the standard LinkedIn export (Settings → Data Privacy → ' +
+    'Export your data → Connections). The file path is sensitive: when you omit `path` and your ' +
+    'client supports URL-mode elicitation, the server gives you a one-time local URL to enter the ' +
+    'path directly — so it never passes through the MCP client/chat transcript.',
   inputSchema: {
-    path:      z.string().min(1).describe('Absolute path to Connections.csv. ~ is expanded.'),
+    path:      z.string().min(1).optional().describe('Absolute path to Connections.csv. ~ is expanded. Omit to capture it out-of-band via URL-mode elicitation.'),
     dry_run:   z.boolean().default(false),
   },
-  handler: async (args) => {
-    const file = expandUserPath(args.path);
+  handler: async (args, ctx) => {
+    // Resolve the path: explicit arg wins; else capture out-of-band when the client
+    // supports URL-mode elicitation; else instruct the user to pass `path`.
+    let rawPath = args.path;
+    if (!rawPath) {
+      if (ctx?.bridge?.canElicitUrl()) {
+        const cap = createCapture({ label: 'Absolute path to your LinkedIn Connections.csv', field: 'path' });
+        try {
+          const r = await ctx.bridge.elicitUrl({
+            message: 'Open this link on the machine running job_ops-mcp and enter the absolute path to your '
+                   + 'LinkedIn Connections.csv. The path goes straight to your local server, not through this chat.',
+            url: cap.url,
+          });
+          // An explicit decline/cancel aborts. Some clients return the value inline in
+          // `content` instead of driving the user to the local form — honor that too.
+          if (r.action === 'decline' || r.action === 'cancel') {
+            return errResult(`LinkedIn path capture ${r.action} — import aborted.`);
+          }
+          const inline = r.content?.path ?? r.content?.value;
+          if (typeof inline === 'string' && inline.trim()) rawPath = inline.trim();
+        } catch { /* client may not resolve URL elicitation with content; await the local form below */ }
+        if (!rawPath) {
+          try { rawPath = await cap.promise; }
+          catch (e: any) { return errResult(`No path submitted: ${e?.message ?? e}`); }
+        }
+      } else {
+        return errResult('Provide `path` (absolute path to Connections.csv). Your client does not support URL-mode elicitation for out-of-band capture.');
+      }
+    }
+    const file = expandUserPath(rawPath);
     if (!existsSync(file)) return errResult(`file not found: ${file}`);
     if (statSync(file).size > MAX_FILE_BYTES) return errResult(`file too large (> ${MAX_FILE_BYTES} bytes)`);
     const allRows = parseCsv(readFileSync(file, 'utf-8'));

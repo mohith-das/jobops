@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.7.0} \\
+\textsf{\small\bfseries Version} & \texttt{0.8.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 37 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 38 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 37 tools.
+One process. Three planes. Six MCP resources and 38 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -453,7 +453,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 33--37 tools should appear in the tool picker.
+Restart Claude Desktop. The 35--38 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -534,11 +534,11 @@ authentication} to anyone who can reach the port. Restrict access to a private n
 public internet.
 \end{warnbox}
 
-\subsection*{Optional: enable the LLM API path}
+\subsection*{Optional: server-side scoring (usually no key needed)}
 
 The default behavior of every reasoning tool is \texttt{mode: chat} \textemdash{} the server returns the rubric + context, your chat client does the thinking, you call the tool again to persist. No LLM key needed.
 
-If you want server-side scoring (the \tool{batch\_evaluate} tool, or \texttt{mode: api} on tools that accept it), set one of:
+For \emph{server-side} scoring (\tool{batch\_evaluate}, or \texttt{mode: api} on tools that accept it), the server first tries \textbf{MCP sampling} \textemdash{} it asks your connected client's model directly, so \textbf{no API key is required}. A BYO key is only the fallback for clients that don't support sampling (see \S\ref{sec:mcp-features}). To configure that fallback:
 
 \begin{lstlisting}[language=bashplus]
 export MCP_JSA_LLM_PROVIDER=gemini
@@ -547,9 +547,12 @@ export GEMINI_API_KEY=...      # free tier covers ordinary single-user usage
 # or
 export MCP_JSA_LLM_PROVIDER=deepseek
 export DEEPSEEK_API_KEY=...
+
+# Force the BYO-key path even when the client could sample:
+export MCP_JSA_SAMPLING=false
 \end{lstlisting}
 
-\tool{cost\_estimate} reports your cumulative spend per provider per tool.
+\tool{cost\_estimate} reports cumulative spend per provider per tool; sampling calls are flagged client-borne (\$0 server cost).
 
 \subsection*{Optional: data imports for the outreach + visa features}
 
@@ -708,7 +711,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-37 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+38 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -1248,6 +1251,64 @@ Hard rules still apply regardless of theme: the visa-leakage scan runs on \textt
 \fpath{.docx} is generated programmatically and does not use themes. If you need visual variation for \fpath{.docx}, edit the output in Word.
 
 % ═════════════════════════════════════════════════════════════════════════════
+\section{MCP protocol features: sampling, elicitation, auth}\label{sec:mcp-features}
+
+Three capabilities lean on the MCP protocol itself. All are \textbf{capability-gated}: the server checks what the connected client advertises during \texttt{initialize} and only uses a feature when it is supported, so older clients degrade gracefully to the pre-existing file/key paths.
+
+\begin{tipbox}
+Sampling and elicitation are server\(\rightarrow\)client \emph{requests}, so they also require a transport that carries bidirectional traffic: \textbf{stdio} (e.g. Claude Desktop). The stateless streamable-HTTP transport answers one POST with one JSON reply and cannot deliver a server-initiated request, so over HTTP both features gate \emph{off} and the server falls back \textemdash{} BYO-key scoring, and the file/argument config paths. The gate checks the transport too, so HTTP clients fall back cleanly instead of hanging.
+\end{tipbox}
+
+\subsection*{MCP sampling \textemdash{} no LLM key required}
+
+The \texttt{api}-path scorers (\tool{batch\_evaluate}, \tool{evaluate\_job} \texttt{mode="api"}) prefer \textbf{sampling}: the server issues a \texttt{sampling/createMessage} request to the connected client and the \emph{client's own model} produces the completion. Same rubric, same strict-JSON contract as the BYO-key path \textemdash{} so there is nothing to collapse at the contract level; one \texttt{Completer} abstraction (\fpath{src/core/scoring.ts}) backs both, and \tool{evaluate\_job}/\tool{batch\_evaluate} report \texttt{scored\_via: "sampling"} or \texttt{"api"}.
+
+\begin{itemize}
+\item \textbf{Selection order:} sampling (if the client advertises it and \texttt{MCP\_JSA\_SAMPLING}\,$\neq$\,\texttt{false}) \(\rightarrow\) BYO key (\texttt{MCP\_JSA\_LLM\_PROVIDER} + key) \(\rightarrow\) otherwise \tool{evaluate\_job} \texttt{mode="chat"} still works (the chat scores it).
+\item \textbf{Cost:} sampling runs on the client's model, so the client bears the cost. \tool{cost\_estimate} still records every sampling call and flags it \texttt{cost\_borne\_by: client} with a \$0 server estimate, so the total is not misread.
+\end{itemize}
+
+\subsection*{MCP elicitation \textemdash{} structured input without YAML edits}
+
+\tool{update\_profile} uses \textbf{form-mode elicitation}: the server sends a JSON-schema form (identity fields + up to three archetype/tagline pairs); on \texttt{accept} it merges the values into \fpath{config/profile.yml} and reseeds the career packet in one step. No client elicitation support? Pass the same values via the \texttt{fields} argument, or edit the YAML by hand \textemdash{} both still work.
+
+For \textbf{sensitive inputs} (a LinkedIn export path, credentials) the server uses \textbf{URL-mode elicitation} (2025-11-25): it hands the client a one-time local URL where you enter the value directly into your own server, so the value \emph{never passes through the MCP client or the chat transcript}. \tool{import\_linkedin} uses this automatically when you omit \texttt{path} and the client supports it; otherwise pass \texttt{path} as before.
+
+\subsection*{Auth \textemdash{} the remote / PII surface}
+
+See \S\ref{sec:security} below for the full table. In short: localhost-only stays open and frictionless; binding to anything else requires \texttt{MCP\_JSA\_AUTH\_TOKEN} or the server refuses to start.
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Security: auth + the PII surface}\label{sec:security}
+
+The HTTP server exposes PII \textemdash{} resume PDFs, cover letters, eval reports, your LinkedIn connections, H1B-derived employer data. The auth posture is a pure function of the bind host and whether a token is set (\fpath{src/core/auth.ts}, \texttt{resolveAuthPolicy}):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{l l X}
+\toprule
+\rowcolor{accent!10}\textbf{Bind host} & \textbf{Token} & \textbf{Result} \\
+\midrule
+\texttt{127.0.0.1} (default) & unset & \textbf{Open} \textemdash{} frictionless local use; PII stays on loopback. \\
+\texttt{127.0.0.1}           & set   & \textbf{Token required} \textemdash{} bearer auth enforced even locally (opt-in). \\
+non-localhost                & \textbf{unset} & \textbf{Refuses to start} (default-deny). \\
+non-localhost                & set   & \textbf{Token required} \textemdash{} bearer auth on every PII route. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+When a token is required, \texttt{/mcp}, \texttt{/files/*}, and the dashboard (\texttt{/}) demand \texttt{Authorization:\ Bearer <token>}. A missing/invalid token returns \texttt{401} with a \texttt{WWW-Authenticate} header pointing at \texttt{/.well-known/oauth-protected-resource}. This realizes the MCP 2025-06-18 ``server as OAuth Resource Server'' model to the extent practical for a self-hosted single-user tool: one operator-provisioned static token (\texttt{MCP\_JSA\_AUTH\_TOKEN}), no full authorization-server flow.
+
+\begin{lstlisting}[language=bashplus]
+export MCP_JSA_HOST=0.0.0.0
+export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
+export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+npx job_ops-mcp start
+\end{lstlisting}
+
+\textbf{Protected:} \texttt{/mcp}, \texttt{/files/*}, \texttt{/}. \textbf{Open by design:} \texttt{/healthz} (liveness, no PII) and the discovery metadata. The URL-mode elicitation capture form (\texttt{/elicit/:id}) is gated by an unguessable one-time id rather than the bearer token, so you can complete it in a browser. \textbf{Hard rule:} PII must never be served unauthenticated to a network \textemdash{} the default-deny boot guard makes a missing token fail loudly instead of silently exposing your data. Even with a token, prefer a private network (Tailscale / VPN / authenticated reverse proxy) over the public internet.
+
+% ═════════════════════════════════════════════════════════════════════════════
 \section{The hard rules (safety model)}
 
 Five rules are enforced at the code level, not just documented. Removing any of them is a one-line change you'd notice in code review.
@@ -1270,6 +1331,10 @@ Every \texttt{api}-path LLM call uses \texttt{response\_format: json\_object}. O
 
 \begin{warnbox}[Rule 5: Serialized writes]
 Every tool that mutates the tracker / applications / outreach goes through \texttt{runInWriteLock()} in \fpath{src/db.ts}. Concurrent tool calls won't interleave their writes; the state machine stays consistent.
+\end{warnbox}
+
+\begin{warnbox}[Rule 6: PII is never served unauthenticated to a network]
+Binding to a non-localhost host without \texttt{MCP\_JSA\_AUTH\_TOKEN} makes the server \textbf{refuse to boot} (default-deny). When a token is set, \texttt{/mcp}, \texttt{/files/*}, and the dashboard require a bearer token; only \texttt{/healthz} + discovery metadata stay open. Resume PDFs, LinkedIn connections, and H1B data never reach an unauthenticated remote caller. See \S\ref{sec:security}.
 \end{warnbox}
 
 \medskip

@@ -338,12 +338,30 @@ export const costEstimateTool = defineTool({
       ORDER BY ms DESC
     `).all(cutoff) as any[];
     let totalUsd = 0;
+    let samplingCalls = 0;
     const items = rows.map(r => {
-      const usd = estimateCostUsd(r.model, Number(r.in_chars ?? 0), Number(r.out_chars ?? 0));
+      // Sampling runs on the connected client's model — the cost is borne by the client,
+      // not by any server-side key. We still record the calls (for volume visibility) but
+      // estimate $0 and flag them so the total isn't misread.
+      const isSampling = r.provider === 'sampling';
+      if (isSampling) samplingCalls += Number(r.calls ?? 0);
+      const usd = isSampling ? 0 : estimateCostUsd(r.model, Number(r.in_chars ?? 0), Number(r.out_chars ?? 0));
       totalUsd += usd;
-      return { ...r, usd_estimate: round4(usd), rate: COST_TABLE[r.model] ?? null };
+      return {
+        ...r,
+        usd_estimate: round4(usd),
+        rate: isSampling ? null : (COST_TABLE[r.model] ?? null),
+        cost_borne_by: isSampling ? 'client (MCP sampling — no server-side key cost)' : 'server (BYO key)',
+      };
     });
-    return okResult({ window_days: args.days, total_usd_estimate: round4(totalUsd), by_provider_model_tool: items });
+    return okResult({
+      window_days: args.days,
+      total_usd_estimate: round4(totalUsd),
+      note: samplingCalls
+        ? `${samplingCalls} call(s) ran via MCP sampling — billed to the connected client's model, not estimated here ($0 server cost).`
+        : undefined,
+      by_provider_model_tool: items,
+    });
   },
 });
 

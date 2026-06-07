@@ -16,6 +16,7 @@ import type { Express, Request, Response } from 'express';
 import { config } from '../config.js';
 import { listResources } from '../core/resources.js';
 import { registerTools, type AnyToolDef } from './define.js';
+import { setDuplexCapable } from './client_bridge.js';
 
 // ── Tool imports ─────────────────────────────────────────────────────────────
 // Keep this block ordered by the brief's grouping for at-a-glance navigation.
@@ -53,6 +54,7 @@ import {
   getCareerPacketTool, updateCareerPacketTool, enrichCompanyTool, costEstimateTool,
 } from './tools/ops.js';
 import { reseedCareerPacketTool } from './tools/reseed.js';
+import { updateProfileTool } from './tools/profile_elicit.js';
 
 // G8 — apply prefill
 import { applyPrefillTool } from './tools/apply_prefill.js';
@@ -75,7 +77,7 @@ const FULL_TOOLSET: AnyToolDef[] = [
   extractStoriesTool, getStoryBankTool, negotiationBriefTool,
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
-  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, enrichCompanyTool, costEstimateTool,
+  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, updateProfileTool, enrichCompanyTool, costEstimateTool,
   applyPrefillTool,
   schedulerStatusTool, schedulerEnableTool, schedulerDisableTool,
 ];
@@ -137,6 +139,10 @@ export function listAllTools(): AnyToolDef[] { return ALL_TOOLS; }
 // Blocks until stdin closes (the client disconnects). In stdio mode the caller
 // must keep stdout clean — all logging in this process already goes to stderr.
 export async function serveStdio(): Promise<void> {
+  // stdio carries bidirectional traffic, so server→client requests (MCP sampling +
+  // elicitation) can actually be delivered. The HTTP transport (stateless + JSON) cannot,
+  // so it leaves this false and those features gate off → clients fall back gracefully.
+  setDuplexCapable(true);
   const server = getMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

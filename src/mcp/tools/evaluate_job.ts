@@ -16,9 +16,9 @@ import { adoptJobFromJD, getJob } from '../../core/jobs.js';
 import { normalizeJD } from '../../core/jd_normalize.js';
 import { saveReport, type ReportBlocks } from '../../core/reports.js';
 import { getActiveCareerPacket } from '../../core/profile.js';
-import { chatLogged } from '../../core/llm.js';
 import { getMode } from '../../core/modes.js';
 import { trackerUrl } from '../../core/links.js';
+import { pickCompleter } from '../../core/scoring.js';
 import { defineTool, okResult, errResult } from '../define.js';
 
 const reportBlocks = {
@@ -65,7 +65,7 @@ export const evaluateJobTool = defineTool({
     scores:   z.object(scores).strict().optional()
                 .describe('Filled by chat on step 2 — strict JSON scores per modes/rubric.md.'),
   },
-  handler: async (args) => {
+  handler: async (args, ctx) => {
     const mode = args.mode ?? 'chat';
     const isFinalize = !!(args.report || args.scores);
 
@@ -122,6 +122,16 @@ export const evaluateJobTool = defineTool({
     }
 
     // ── Step 1 (api mode) — run scoring + report inline ─────────────────────
+    // "api" here means server-side completion: MCP sampling (client model, no key) when
+    // available, else the BYO-key provider. Same rubric + strict-JSON contract either way.
+    const picked = pickCompleter(ctx?.bridge);
+    if (!picked) {
+      return errResult(
+        'mode="api" needs a scoring backend: connect an MCP client that supports sampling ' +
+        '(no key needed), or set MCP_JSA_LLM_PROVIDER=gemini with GEMINI_API_KEY. ' +
+        'Otherwise use mode="chat" (the default) — your chat client scores it.',
+      );
+    }
     try {
       const packet = getActiveCareerPacket()?.content ?? '';
       const userMsg = `== JOB (title=${jd.title_guess ?? ''}, company=${jd.company_guess ?? ''}) ==\n${jd.text}`;
@@ -139,12 +149,12 @@ export const evaluateJobTool = defineTool({
 
       // Scoring + blocks are independent given the same JD — run in parallel.
       const [scoreCall, blocksCall] = await Promise.all([
-        chatLogged('evaluate_job.api.scores', [
+        picked.completer('evaluate_job.api.scores', [
           { role: 'system', content: scoringSystem }, { role: 'user', content: userMsg },
-        ], { responseFormat: 'json_object', temperature: 0.2, jobId: adopted.id }),
-        chatLogged('evaluate_job.api.blocks', [
+        ], { temperature: 0.2, jobId: adopted.id }),
+        picked.completer('evaluate_job.api.blocks', [
           { role: 'system', content: blocksSystem }, { role: 'user', content: userMsg },
-        ], { responseFormat: 'json_object', temperature: 0.3, maxTokens: 6000, jobId: adopted.id }),
+        ], { temperature: 0.3, maxTokens: 6000, jobId: adopted.id }),
       ]);
       const scoreData = (scoreCall.parsed ?? null) as any;
 
@@ -160,6 +170,7 @@ export const evaluateJobTool = defineTool({
       return okResult({
         step: 'finalized',
         mode: 'api',
+        scored_via: picked.kind,   // 'sampling' (client model, no key) or 'api' (BYO key)
         job_id: adopted.id,
         report_id: saved.id,
         report_url: saved.url,

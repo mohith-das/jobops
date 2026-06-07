@@ -58,6 +58,14 @@ ergonomic — "change my tagline" only re-sends Section 2, not the whole packet:
 update_career_packet section="2" section_content='- **Builder PM** — "ships product with engineering teeth"'
 ```
 
+For surgical, **item-level** changes there's `edit_packet_item` / `remove_packet_item` —
+address a section (`projects`, `skills`, `taglines`, or a number) and one item (by index or a
+matching substring) to change or drop a single bullet/project/skill/tagline without touching
+the rest. Every change still versions the packet, and `edit_packet_item` runs the
+visa-leakage scan on the new text. `remove_packet_item` echoes exactly what it removed. Since
+every change is a version, **nothing is truly lost** — `restore_packet_version` lists history
+and brings any prior version back (restore is itself reversible).
+
 **2. File-driven (cv.md / profile.yml are the source).** Edit `cv.md` /
 `config/profile.yml`, then **reseed** to rebuild the packet from them:
 
@@ -107,7 +115,7 @@ without one.
 
 ---
 
-## Tools (41 — one MCP `tools/list` call away)
+## Tools (47 — one MCP `tools/list` call away)
 
 | Group | Tools |
 |---|---|
@@ -115,10 +123,11 @@ without one.
 | **Materials** | `generate_materials`, `render_pdf` (PDF / `.tex` / `.docx`), `get_report` |
 | **Tracker** | `get_tracker`, `update_status`, `mark_ready_to_apply` |
 | **Sourcing** | `scan_portals` (Greenhouse + Ashby + Lever + Workday + Amazon + Google + generic Playwright) |
-| **Outreach** | `find_warm_intros`, `find_founders`, `add_contacts` (insert/update network contacts from chat), `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
+| **Outreach** | `find_warm_intros`, `find_founders`, `draft_outreach`, `draft_followup`, `draft_reply`, `get_outreach_queue`, `update_outreach`, `get_followups_due` |
+| **Contacts** | `add_contacts` (upsert from chat), `export_contacts` (CSV+JSON backup), `import_contacts` (merge, non-destructive), `delete_contacts` (soft-delete, recoverable) |
 | **Interview / offer** | `extract_stories`, `get_story_bank`, `negotiation_brief` |
 | **Research** | `deep_research`, `enrich_company`, `daily_digest` |
-| **Profile + ops** | `get_career_packet`, `update_career_packet` (chat edits, section-level), `reseed_career_packet` (safe by default), `sync_packet_to_cv` (packet → cv.md), `update_profile` (elicitation), `cost_estimate`, `doctor` (read-only health report) |
+| **Profile + ops** | `get_career_packet`, `update_career_packet` (whole-doc), `edit_packet_item` / `remove_packet_item` (one bullet/project/skill/tagline), `restore_packet_version` (history + restore), `reseed_career_packet` (safe by default), `sync_packet_to_cv`, `update_profile` (elicitation), `cost_estimate`, `doctor` (read-only health) |
 | **Apply (preview only — never submits)** | `apply_prefill` |
 | **Visa (optional, can be hidden)** | `visa_signal`, `import_h1b`, `import_linkedin` |
 | **Scheduler (opt-in cron, off by default)** | `scheduler_status`, `scheduler_enable`, `scheduler_disable` |
@@ -553,6 +562,24 @@ path; and infers `is_recruiter` / `is_engineering` / `is_leadership` from the ti
 pass them. Partial contacts are stored and the per-contact result reports what was missing
 (`no linkedin_url`, company unmatched, …) so the chat can ask you to fill the gaps. (Claude
 parses your free-text/pasted contact info into these fields before calling.)
+
+**Backup, portability, and safe deletion** — all non-destructive, sharing one philosophy
+(timestamped backups before anything risky; deletes are reversible):
+
+- **`export_contacts`** writes **every** contact and field (flags, notes, email, resolved
+  company, ids, archived state) to timestamped `contacts_export_*.csv` **and** `.json` in the
+  project root. Your backup / portability path.
+- **`import_contacts path="…"`** reads a `.json`/`.csv` (e.g. a prior export) and **upserts /
+  merges — never delete-and-replace**: blank/absent fields never overwrite richer existing
+  data, existing rows match (no duplicates), new rows insert. Re-importing an export is
+  **idempotent** — same DB, zero loss. A backup is written **before** the import.
+- **`delete_contacts`** soft-deletes 1..N people (by `linkedin_url`, `full_name`+company, or
+  `id`). Archived contacts vanish from `find_warm_intros` / `find_founders` but **stay
+  recoverable** in the row; a backup is written first; and the result **echoes exactly which
+  rows matched** (name + company + url) so a wrong fuzzy match is caught.
+
+> **Guarantee:** export → (edits happen) → re-import never destroys data not present in the
+> imported file. The imported file is additive/updating, not authoritative-overwrite.
 
 Company names are matched **fuzzily** so legal-name variants line up: `import_linkedin`,
 `import_h1b`, JD ingestion, `visa_signal`, and `find_warm_intros` all normalize names by

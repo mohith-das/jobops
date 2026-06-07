@@ -601,6 +601,112 @@ export function editPacketSection(packetContent: string, section: string, newBod
   return replaceSectionBody(packetContent, prefix, newBody);
 }
 
+// ── Granular item-level packet edits (one bullet/project/skill/tagline) ────────
+
+const SECTION_ALIASES: Record<string, string> = {
+  identity: '1.', taglines: '2.', tagline: '2.',
+  projects: '6.', project: '6.', skills: '7.', skill: '7.', education: '8.',
+};
+
+/** Resolve a section argument ("6", "projects", "taglines", …) to a `## N.` prefix that exists. */
+function resolveSectionPrefix(packetContent: string, section: string): string {
+  const s = section.trim().toLowerCase();
+  const num = s.match(/^(\d+)\.?$/);
+  const prefix = num ? `${num[1]}.` : SECTION_ALIASES[s];
+  if (!prefix) {
+    throw new Error(`Unknown section "${section}". Use a number (e.g. "6") or one of: taglines, projects, skills, education `
+      + `(experience spans sections 3/4/5 — address those by number).`);
+  }
+  const headingRe = new RegExp(`^## ${prefix.replace('.', '\\.')}[^\\n]*$`, 'm');
+  if (!headingRe.test(packetContent)) {
+    const have = [...packetContent.matchAll(/^## (\d+)\./gm)].map(x => x[1]).join(', ');
+    throw new Error(`Section ${prefix} not found. Sections present: ${have || '(none)'}.`);
+  }
+  return prefix;
+}
+
+const isBullet = (line: string) => /^\s*-\s+/.test(line);
+const bulletText = (line: string) => line.replace(/^\s*-\s+/, '').trim();
+
+/** Find the single bullet line index in `bodyLines` matching `item` (1-based index or substring). */
+function resolveItemLine(bodyLines: string[], item: string | number): number {
+  const bulletIdxs = bodyLines.map((l, i) => (isBullet(l) ? i : -1)).filter(i => i >= 0);
+  if (!bulletIdxs.length) throw new Error('That section has no list items to edit.');
+
+  if (typeof item === 'number' || /^\d+$/.test(String(item).trim())) {
+    const n = Number(item);
+    if (n < 1 || n > bulletIdxs.length) {
+      throw new Error(`Item ${n} is out of range — the section has ${bulletIdxs.length} item(s).`);
+    }
+    return bulletIdxs[n - 1];
+  }
+  const needle = String(item).trim().toLowerCase();
+  const matches = bulletIdxs.filter(i => bodyLines[i].toLowerCase().includes(needle));
+  if (matches.length === 0) throw new Error(`No item matching "${item}" in that section.`);
+  if (matches.length > 1) {
+    const list = matches.map(i => `"${bulletText(bodyLines[i]).slice(0, 60)}"`).join('; ');
+    throw new Error(`"${item}" matches ${matches.length} items — be more specific. Matches: ${list}`);
+  }
+  return matches[0];
+}
+
+export interface PacketItemEdit { section: string; item_index_in_section: number; old_item: string; new_item?: string; removed_item?: string; new_version: number; }
+
+/** Replace ONE item (bullet/project/skill/tagline) in a section, in place. Versions the packet. */
+export async function editPacketItem(section: string, item: string | number, newText: string): Promise<PacketItemEdit> {
+  const active = getActiveCareerPacket();
+  if (!active) throw new Error('No active career_packet to edit.');
+  const prefix = resolveSectionPrefix(active.content, section);
+  const body = splitNumberedSections(active.content).get(prefix) ?? '';
+  const lines = body.split('\n');
+  const idx = resolveItemLine(lines, item);
+  const old_item = bulletText(lines[idx]);
+  const indent = (lines[idx].match(/^\s*/) ?? [''])[0];
+  lines[idx] = `${indent}- ${newText.trim()}`;
+  const newContent = replaceSectionBody(active.content, prefix, lines.join('\n'));
+  const r = await writeChatEditedPacket(newContent, `edited item in section ${prefix} (chat)`);
+  return { section: prefix, item_index_in_section: lines.slice(0, idx).filter(isBullet).length + 1,
+           old_item, new_item: newText.trim(), new_version: r.version };
+}
+
+/** Remove ONE item from a section. Versions the packet. Echoes the removed item. */
+export async function removePacketItem(section: string, item: string | number): Promise<PacketItemEdit> {
+  const active = getActiveCareerPacket();
+  if (!active) throw new Error('No active career_packet to edit.');
+  const prefix = resolveSectionPrefix(active.content, section);
+  const body = splitNumberedSections(active.content).get(prefix) ?? '';
+  const lines = body.split('\n');
+  const idx = resolveItemLine(lines, item);
+  const removed_item = bulletText(lines[idx]);
+  const itemNo = lines.slice(0, idx).filter(isBullet).length + 1;
+  lines.splice(idx, 1);
+  const newContent = replaceSectionBody(active.content, prefix, lines.join('\n'));
+  const r = await writeChatEditedPacket(newContent, `removed item from section ${prefix} (chat)`);
+  return { section: prefix, item_index_in_section: itemNo, old_item: removed_item, removed_item, new_version: r.version };
+}
+
+// ── Packet version history + restore (reversibility) ──────────────────────────
+
+export interface PacketVersionInfo { version: number; origin: PacketOrigin; is_active: boolean; bytes: number; notes: string | null; created_at: string; }
+
+export function listPacketVersions(): PacketVersionInfo[] {
+  return (getDb().prepare(`
+    SELECT version, origin, is_active, length(content) AS bytes, notes, created_at
+    FROM career_packet ORDER BY version DESC
+  `).all() as any[]).map(r => ({
+    version: r.version, origin: (r.origin ?? 'reseed') as PacketOrigin, is_active: !!r.is_active,
+    bytes: r.bytes, notes: r.notes, created_at: r.created_at,
+  }));
+}
+
+/** Restore a prior packet version by writing its content as a NEW active version (history kept). */
+export async function restorePacketVersion(version: number): Promise<{ restored_from: number; new_version: number }> {
+  const row = getDb().prepare(`SELECT content FROM career_packet WHERE version = ?`).get(version) as { content: string } | undefined;
+  if (!row) throw new Error(`No career_packet version ${version}. Use list (no version) to see available versions.`);
+  const r = await writeChatEditedPacket(row.content, `restored from v${version}`);
+  return { restored_from: version, new_version: r.version };
+}
+
 function splitNumberedSections(content: string): Map<string, string> {
   const out = new Map<string, string>();
   const re = /^## (\d+\.)[^\n]*$/gm;

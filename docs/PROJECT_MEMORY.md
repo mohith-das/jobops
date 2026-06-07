@@ -13,7 +13,7 @@
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **41 tools** + **6
+job_ops-mcp exposes a full job-search pipeline to your MCP client as **47 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -91,7 +91,7 @@ directions (see §12):
 
 ---
 
-## 3. The 41 tools (grouped)
+## 3. The 47 tools (grouped)
 
 Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (server-side).
 
@@ -132,6 +132,14 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   `linkedin_connections`, so contacts are discoverable by `find_warm_intros`/`find_founders`.
   Only `full_name` required; partial contacts are stored and gaps reported per contact. The
   client parses free-text into the structured fields first.
+- `export_contacts` — dump ALL contacts + every field to timestamped `contacts_export_*.csv`
+  + `.json` in the project root (backup/portability).
+- `import_contacts path="…"` — **upsert/merge** from a `.json`/`.csv` (never delete-and-replace;
+  blank fields don't overwrite richer data; idempotent re-import = no dups, no loss). Writes a
+  backup first.
+- `delete_contacts` — **soft-delete** 1..N (by `linkedin_url` / `full_name`+company / `id`).
+  Archived rows hidden from `find_warm_intros`/`find_founders` but recoverable; backup written
+  first; result echoes exactly which rows matched.
 - `draft_outreach` — warm-intro / founder DM (2-step chat, or `mode=api`); validates safety rails.
 - `draft_followup` / `draft_reply` — nudge / reply drafts.
 - `get_outreach_queue` / `update_outreach` / `get_followups_due` — manage the queue + due nudges.
@@ -159,6 +167,12 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   (Sections 3–8) + `profile.yml` (taglines/identity) so the source files catch up to chat
   edits and a later reseed reproduces them. Optional `then_reseed:true` to rebuild + reconcile
   in one step.
+- `edit_packet_item` / `remove_packet_item` — change/remove ONE item (bullet/project/skill/
+  tagline) in a section (`projects`/`skills`/`taglines`/`education` or a number; experience =
+  3/4/5) by 1-based index or matching substring — no whole-doc resend. Versions the packet;
+  edit runs the visa scan on new text; remove echoes what it deleted.
+- `restore_packet_version` — list packet versions (call with no arg) or restore one (writes its
+  content as a new active version). Makes every edit/removal reversible.
 - `update_profile` — capture identity fields + taglines via elicitation (or `fields={...}`),
   write `profile.yml`, and reseed in one step (see §8).
 - `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as

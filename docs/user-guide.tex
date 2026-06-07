@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.9.3} \\
+\textsf{\small\bfseries Version} & \texttt{0.10.0} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -221,7 +221,7 @@ Not affiliated with or endorsed by santifer/career-ops.}
 % ═════════════════════════════════════════════════════════════════════════════
 \section{What this is, and the mental model}
 
-\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 41 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
+\pkg{} is a self-hosted \textbf{Model Context Protocol} server that exposes the full job-search workflow to your chat client as 47 tools and 6 editable behaviour-shaping resources. The chat client (Claude Desktop, LibreChat, Cursor, any MCP-aware client that speaks streamable-HTTP) does the reasoning; the server executes the mechanical work and returns every generated artifact as an \texttt{http://localhost:7891/...} link the chat can paste straight into the conversation.
 
 The split is the whole point.
 
@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 41 tools.
+One process. Three planes. Six MCP resources and 47 tools.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -465,7 +465,7 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 }
 \end{lstlisting}
 
-Restart Claude Desktop. The 38--41 tools should appear in the tool picker.
+Restart Claude Desktop. The 44--47 tools should appear in the tool picker.
 
 \subsubsection*{LibreChat (host process)}
 
@@ -723,7 +723,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Tool reference}
 
-41 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
+47 tools, grouped by what they do. For each: what it does, key parameters, what it returns. The default mode for tools that take one is \texttt{chat} \textemdash{} the chat client is the brain; \texttt{api} mode is the LLM-direct path and needs an API key.
 
 \subsection*{Evaluation}
 
@@ -768,6 +768,9 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 \item[\tool{find\_warm\_intros}] Joins \tool{jobs} \(\times\) non-recruiter LinkedIn connections at the same company. Filter by \texttt{company} substring and \texttt{min\_score}. Sorted by score then contact priority (engineering peers $\rightarrow$ leadership $\rightarrow$ others).
 \item[\tool{find\_founders}] Founders / CEO / CTO / c-suite from your network, derived via \tool{v\_founder\_network}. Filter by \texttt{kind}. Stealth-company rows are flagged but excluded by default.
 \item[\tool{add\_contacts}] Insert/update \textbf{1..N} network contacts from chat in one transaction \textemdash{} complements the bulk \tool{import\_linkedin} CSV path, for people found mid-search. Upserts into \fpath{linkedin\_connections} (matched on \texttt{linkedin\_url}, else \texttt{full\_name} + company \textemdash{} no silent duplicates), resolves company names with the same alias normalization, infers \texttt{is\_recruiter}/\texttt{is\_engineering}/\texttt{is\_leadership} from the title unless you pass them, and merges (never clobbers) on update. Only \texttt{full\_name} is required; partial contacts are stored and the per-contact result reports what was missing/unresolved. Invalid rows (no \texttt{full\_name}) are skipped + reported, not failing the batch. The client parses free-text/pasted info into the structured fields first.
+\item[\tool{export\_contacts}] Writes ALL contacts + every field (flags, notes, email, resolved company, ids, archived state) to timestamped \fpath{contacts\_export\_*.csv} and \fpath{.json} in the project root. The backup / portability path.
+\item[\tool{import\_contacts}] Imports a \fpath{.json}/\fpath{.csv} (e.g. a prior export). \textbf{Upsert/merge, never delete-and-replace}: blank/absent fields don't overwrite richer existing data; matches existing rows (no duplicates); inserts new. Idempotent re-import. Writes a backup first.
+\item[\tool{delete\_contacts}] Soft-deletes 1..N contacts (by \texttt{id} / \texttt{linkedin\_url} / \texttt{full\_name}+company). Archived rows are hidden from \tool{find\_warm\_intros}/\tool{find\_founders} but recoverable in the row. Writes a backup first; echoes exactly which rows matched (name + company + url) so a wrong fuzzy match is catchable.
 \item[\tool{draft\_outreach}] Two-step chat: step 1 returns connection + job context + outreach tone rules; step 2 takes the chat-drafted \texttt{message} and persists it after validation (char cap, no emojis, no exclamation marks, no ``refer me'', no visa mentions). \texttt{api} mode does the LLM call inline.
 \item[\tool{draft\_followup}] 1\textendash{}2 line nudge for sent-but-unanswered DMs. Same safety rails. Capped at 300 chars.
 \item[\tool{draft\_reply}] Contextual draft when someone has replied. Takes the received reply text, returns a tone-matched response for human editing. Cap 800 chars.
@@ -802,6 +805,8 @@ When \env{MCP\_JSA\_VISA\_SCORING=false}, all three visa tools are hidden from \
 \item[\tool{get\_career\_packet}] Returns the active packet (id, version, markdown content, source-cv hash).
 \item[\tool{update\_career\_packet}] Replaces the active packet with a new version. Bumps \texttt{version}, demotes the previous \texttt{is\_active}.
 \item[\tool{reseed\_career\_packet}] Rebuilds the packet from the current \fpath{cv.md} + \fpath{config/profile.yml}. Same as the CLI \cmd{reseed} command. Bumps version, demotes the previous active row (history kept). Use after editing \fpath{cv.md}. Refuses to seed identity-only unless you pass \texttt{confirm\_empty\_cv: true}.
+\item[\tool{edit\_packet\_item} / \tool{remove\_packet\_item}] Change or remove ONE item (bullet / project / skill / tagline) in a section (\texttt{projects}/\texttt{skills}/\texttt{taglines}/\texttt{education} or a number; experience = 3/4/5), addressed by 1-based index or a matching substring \textemdash{} no whole-document resend. Each versions the packet (history kept); \tool{edit\_packet\_item} runs the visa-leakage scan on the new text; \tool{remove\_packet\_item} echoes the removed item.
+\item[\tool{restore\_packet\_version}] With no argument: lists packet versions (number, origin, active, size, notes, time). With \texttt{version}: restores that version's content as a new active version \textemdash{} so every granular edit/removal is reversible.
 \item[\tool{enrich\_company}] Persists a chat- or api-provided enrichment summary for one (company, kind) pair with a 30-day TTL.
 \item[\tool{deep\_research}] Company brief \textemdash{} aggregates current enrichments + top jobs + warm intros + H1B signal. With \texttt{notes} + \texttt{kind} provided in \texttt{api} mode, summarizes the notes into a single enrichment row.
 \item[\tool{daily\_digest}] Morning summary \textemdash{} new top jobs since last digest, follow-ups due, recent status changes, cost snapshot. Stamps \texttt{digest\_state.last\_digest\_at} unless \texttt{dry\_run}.

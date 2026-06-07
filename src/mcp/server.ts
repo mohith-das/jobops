@@ -41,6 +41,7 @@ import {
 // G4 — visa
 import { visaSignalTool, importH1bTool, importLinkedinTool } from './tools/visa.js';
 import { addContactsTool } from './tools/add_contacts.js';
+import { exportContactsTool, importContactsTool, deleteContactsTool } from './tools/contacts_io.js';
 
 // G5 — stories + negotiation
 import { extractStoriesTool, getStoryBankTool, negotiationBriefTool } from './tools/stories.js';
@@ -56,6 +57,7 @@ import {
 } from './tools/ops.js';
 import { reseedCareerPacketTool } from './tools/reseed.js';
 import { syncPacketToCvTool } from './tools/sync_packet.js';
+import { editPacketItemTool, removePacketItemTool, restorePacketVersionTool } from './tools/packet_edit.js';
 import { updateProfileTool } from './tools/profile_elicit.js';
 import { doctorTool } from './tools/doctor.js';
 
@@ -76,11 +78,14 @@ const FULL_TOOLSET: AnyToolDef[] = [
   scanPortalsTool,
   findWarmIntrosTool, findFoundersTool, draftOutreachTool, getOutreachQueueTool,
   updateOutreachTool, getFollowupsDueTool, draftFollowupTool, draftReplyTool,
-  visaSignalTool, importH1bTool, importLinkedinTool, addContactsTool,
+  visaSignalTool, importH1bTool, importLinkedinTool,
+  addContactsTool, exportContactsTool, importContactsTool, deleteContactsTool,
   extractStoriesTool, getStoryBankTool, negotiationBriefTool,
   batchEvaluateTool, generateMaterialsTool,
   evaluateTrainingTool, evaluateProjectTool, deepResearchTool, dailyDigestTool,
-  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, syncPacketToCvTool, updateProfileTool, enrichCompanyTool, costEstimateTool,
+  getCareerPacketTool, updateCareerPacketTool, reseedCareerPacketTool, syncPacketToCvTool,
+  editPacketItemTool, removePacketItemTool, restorePacketVersionTool,
+  updateProfileTool, enrichCompanyTool, costEstimateTool,
   doctorTool,
   applyPrefillTool,
   schedulerStatusTool, schedulerEnableTool, schedulerDisableTool,

@@ -133,6 +133,51 @@ test('reports chat-edited packet state (not a staleness nag)', async () => {
   assert.match(cp.detail, /chat-edited/);
 });
 
+test('sampling check reports the LIVE negotiated client state (no overstatement)', async () => {
+  const { runDoctorChecks } = await import('../dist/core/doctor.js');
+  const { seedCareerPacketFromFiles } = await import('../dist/core/profile.js');
+  await seedCareerPacketFromFiles({ mode: 'reseed', force: true });
+
+  // Client connected but did NOT advertise sampling (e.g. Claude Desktop) → BYO key.
+  const notAdv = byId(await runDoctorChecks({
+    context: 'server', sampling: { clientConnected: true, advertised: false, usable: false },
+  }), 'sampling');
+  assert.match(notAdv.detail, /NOT advertised/i);
+  assert.match(notAdv.detail, /BYO key/i);
+  assert.match(notAdv.detail, /modelcontextprotocol\.io\/clients/);
+
+  // Client advertised sampling and it's usable → key optional.
+  const adv = byId(await runDoctorChecks({
+    context: 'server', sampling: { clientConnected: true, advertised: true, usable: true },
+  }), 'sampling');
+  assert.match(adv.detail, /available/i);
+  assert.match(adv.detail, /optional/i);
+
+  // No live info (e.g. cold CLI) → general "depends on your client" guidance, no claim that
+  // stdio/Claude Desktop grants sampling.
+  const cold = byId(await runDoctorChecks({ context: 'cold' }), 'sampling');
+  assert.match(cold.detail, /only if the connected client advertises|engages automatically IF the connected client advertises/i);
+  assert.match(cold.detail, /Claude Desktop/);
+  assert.doesNotMatch(cold.detail, /stdio client.*(no key|key optional)/i);
+});
+
+test('doctor tool threads the live sampling state from the connected client', async () => {
+  const { doctorTool } = await import('../dist/mcp/tools/doctor.js');
+  const { seedCareerPacketFromFiles } = await import('../dist/core/profile.js');
+  await seedCareerPacketFromFiles({ mode: 'reseed', force: true });
+
+  // Mock a connected client that did NOT advertise sampling (the Claude Desktop case).
+  const bridge = {
+    canSample: () => false, canElicit: () => false, canElicitUrl: () => false,
+    clientConnected: () => true, clientAdvertisedSampling: () => false,
+    sample: async () => ({ text: '', model: '' }),
+    elicitForm: async () => ({ action: 'cancel' }), elicitUrl: async () => ({ action: 'cancel' }),
+  };
+  const res = await doctorTool.handler({}, { bridge });
+  const sampling = res.structuredContent.checks.find(c => c.id === 'sampling');
+  assert.match(sampling.detail, /NOT advertised/i);
+});
+
 test('cv.md-edited-after-reseed: warning in server context, failure in cold context', async () => {
   const { runDoctorChecks } = await import('../dist/core/doctor.js');
   const { seedCareerPacketFromFiles } = await import('../dist/core/profile.js');

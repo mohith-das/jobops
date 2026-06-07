@@ -202,7 +202,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 \vspace{0.6em}
 
 \begin{tabular}{rl}
-\textsf{\small\bfseries Version} & \texttt{0.9.1} \\
+\textsf{\small\bfseries Version} & \texttt{0.9.2} \\
 \textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
@@ -546,11 +546,11 @@ authentication} to anyone who can reach the port. Restrict access to a private n
 public internet.
 \end{warnbox}
 
-\subsection*{Optional: server-side scoring (usually no key needed)}
+\subsection*{Optional: server-side scoring (BYO key on most clients)}
 
 The default behavior of every reasoning tool is \texttt{mode: chat} \textemdash{} the server returns the rubric + context, your chat client does the thinking, you call the tool again to persist. No LLM key needed.
 
-For \emph{server-side} scoring (\tool{batch\_evaluate}, or \texttt{mode: api} on tools that accept it), the server first tries \textbf{MCP sampling} \textemdash{} it asks your connected client's model directly, so \textbf{no API key is required}. A BYO key is only the fallback for clients that don't support sampling (see \S\ref{sec:mcp-features}). To configure that fallback:
+For \emph{server-side} scoring (\tool{batch\_evaluate}, or \texttt{mode: api} on tools that accept it), the server will use \textbf{MCP sampling} \textemdash{} asking your connected client's model directly, with \textbf{no API key} \textemdash{} \emph{but only if that client advertises the \texttt{sampling} capability}. Most clients, \textbf{including Claude Desktop as of now, do NOT}, so in practice you set a BYO key for server-side scoring (see \S\ref{sec:mcp-features} and \href{https://modelcontextprotocol.io/clients}{modelcontextprotocol.io/clients}). To configure the BYO key:
 
 \begin{lstlisting}[language=bashplus]
 export MCP_JSA_LLM_PROVIDER=gemini
@@ -1268,17 +1268,17 @@ Hard rules still apply regardless of theme: the visa-leakage scan runs on \textt
 
 Three capabilities lean on the MCP protocol itself. All are \textbf{capability-gated}: the server checks what the connected client advertises during \texttt{initialize} and only uses a feature when it is supported, so older clients degrade gracefully to the pre-existing file/key paths.
 
-\begin{tipbox}
-Sampling and elicitation are server\(\rightarrow\)client \emph{requests}, so they also require a transport that carries bidirectional traffic: \textbf{stdio} (e.g. Claude Desktop). The stateless streamable-HTTP transport answers one POST with one JSON reply and cannot deliver a server-initiated request, so over HTTP both features gate \emph{off} and the server falls back \textemdash{} BYO-key scoring, and the file/argument config paths. The gate checks the transport too, so HTTP clients fall back cleanly instead of hanging.
-\end{tipbox}
+\begin{warnbox}[Sampling depends on your client — most don't support it]
+Sampling and elicitation are server\(\rightarrow\)client \emph{requests} that the client must opt into by advertising the capability in its \texttt{initialize} handshake. \textbf{The transport is not sufficient on its own:} stdio is \emph{necessary} (the stateless streamable-HTTP transport can't deliver a server-initiated request at all), but a stdio client still has to advertise \texttt{sampling}. \textbf{Most clients do not \textemdash{} including Claude Desktop, as of now} (it advertises only its UI extension, never \texttt{sampling}). So on Claude Desktop, server-side scoring uses the \textbf{BYO key}, which is expected and correct. Check current support at \href{https://modelcontextprotocol.io/clients}{modelcontextprotocol.io/clients}, and run the \tool{doctor} tool to see the live negotiated state for your client.
+\end{warnbox}
 
-\subsection*{MCP sampling \textemdash{} no LLM key required}
+\subsection*{MCP sampling \textemdash{} no LLM key required \emph{when the client supports it}}
 
-The \texttt{api}-path scorers (\tool{batch\_evaluate}, \tool{evaluate\_job} \texttt{mode="api"}) prefer \textbf{sampling}: the server issues a \texttt{sampling/createMessage} request to the connected client and the \emph{client's own model} produces the completion. Same rubric, same strict-JSON contract as the BYO-key path \textemdash{} so there is nothing to collapse at the contract level; one \texttt{Completer} abstraction (\fpath{src/core/scoring.ts}) backs both, and \tool{evaluate\_job}/\tool{batch\_evaluate} report \texttt{scored\_via: "sampling"} or \texttt{"api"}.
+The \texttt{api}-path scorers (\tool{batch\_evaluate}, \tool{evaluate\_job} \texttt{mode="api"}) will use \textbf{sampling}: the server issues a \texttt{sampling/createMessage} request to the connected client and the \emph{client's own model} produces the completion \textemdash{} same rubric, same strict-JSON contract as the BYO-key path. One \texttt{Completer} abstraction (\fpath{src/core/scoring.ts}) backs both, and \tool{evaluate\_job}/\tool{batch\_evaluate} report \texttt{scored\_via: "sampling"} or \texttt{"api"}. This engages \textbf{automatically if (and only if) a sampling-capable client connects} \textemdash{} no configuration needed.
 
 \begin{itemize}
-\item \textbf{Selection order:} sampling (if the client advertises it and \texttt{MCP\_JSA\_SAMPLING}\,$\neq$\,\texttt{false}) \(\rightarrow\) BYO key (\texttt{MCP\_JSA\_LLM\_PROVIDER} + key) \(\rightarrow\) otherwise \tool{evaluate\_job} \texttt{mode="chat"} still works (the chat scores it).
-\item \textbf{Cost:} sampling runs on the client's model, so the client bears the cost. \tool{cost\_estimate} still records every sampling call and flags it \texttt{cost\_borne\_by: client} with a \$0 server estimate, so the total is not misread.
+\item \textbf{Selection order:} sampling (only if the client advertised \texttt{sampling} \emph{and} \texttt{MCP\_JSA\_SAMPLING}\,$\neq$\,\texttt{false}) \(\rightarrow\) BYO key (\texttt{MCP\_JSA\_LLM\_PROVIDER} + key) \(\rightarrow\) otherwise \tool{evaluate\_job} \texttt{mode="chat"} still works (the chat scores it). On a client without sampling (e.g. Claude Desktop), set the BYO key for \tool{batch\_evaluate} / \texttt{mode="api"}.
+\item \textbf{Cost:} when sampling \emph{is} used it runs on the client's model, so the client bears the cost. \tool{cost\_estimate} records every sampling call flagged \texttt{cost\_borne\_by: client} with a \$0 server estimate, so the total is not misread.
 \end{itemize}
 
 \subsection*{MCP elicitation \textemdash{} structured input without YAML edits}

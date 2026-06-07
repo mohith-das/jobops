@@ -134,23 +134,32 @@ tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all load
 
 ---
 
-## No LLM key needed (MCP sampling)
+## Scoring without an LLM key — IF your client supports MCP sampling
 
-The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) prefer **MCP sampling**:
-the server asks your *already-connected client's model* for the completion — same rubric,
-same strict-JSON contract — so you need **no separate Gemini/DeepSeek key**. The chat-mode
-and api-mode rating paths collapse into one sampling-based path.
+The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) can run on your
+*connected client's model* via **MCP sampling** — same rubric, same strict-JSON contract,
+**no separate Gemini/DeepSeek key** — **but only if the connected client advertises the
+`sampling` capability** in its initialize handshake.
 
-- **Capability- and transport-gated.** Sampling is a server→client request, so it needs a
-  transport that carries bidirectional traffic — **stdio** (e.g. Claude Desktop). The
-  stateless HTTP transport can't deliver server-initiated requests, so HTTP clients
-  **fall back automatically** to the BYO-key path (`MCP_JSA_LLM_PROVIDER` + key); if that
-  isn't configured either, `evaluate_job mode="chat"` (the default) still works — your
-  chat scores it directly. The gate checks both your client's advertised `sampling`
-  capability and the transport, so a fallback is clean (no hang).
-- **Cost.** Sampling runs on the client's model, so the cost is **borne by the client**.
-  `cost_estimate` still works: sampling calls are recorded and flagged as client-borne
-  ($0 server cost) so the total isn't misread.
+> ⚠️ **Most clients don't (yet) — including Claude Desktop, as of now.** Claude Desktop
+> advertises only its UI extension, never `sampling`. The transport (stdio vs HTTP) is **not**
+> sufficient on its own — it's a per-client *capability*. So on Claude Desktop and similar
+> clients, batch/api scoring **falls back to the BYO key** (`MCP_JSA_LLM_PROVIDER` + key),
+> which is expected and correct. Check current support at
+> [modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients).
+
+- **It engages automatically if (and only if) a sampling-capable client connects** — no
+  configuration needed. The gate checks both the client's advertised `sampling` capability
+  **and** that the transport can carry the server→client request (stdio; the stateless HTTP
+  transport can't, so it never even tries). When sampling isn't available, scoring uses the
+  BYO key; if that isn't set either, `evaluate_job mode="chat"` (the default) still works —
+  your chat scores it directly. Fallback is clean (no hang).
+- **Bottom line for Claude Desktop users:** set `MCP_JSA_LLM_PROVIDER` + the matching key
+  for `batch_evaluate` / `evaluate_job mode="api"`. (Plain `mode="chat"` needs no key.)
+- **Cost.** When sampling *is* used it runs on the client's model, so the cost is **borne by
+  the client**; `cost_estimate` records those calls flagged client-borne ($0 server cost).
+- Run the `doctor` tool to see the **live** state — it reports whether your current client
+  advertised sampling or whether you're on the BYO-key path.
 - Set `MCP_JSA_SAMPLING=false` to force the BYO-key path even when sampling is available.
 
 ## Frictionless profile setup (MCP elicitation)
@@ -233,10 +242,10 @@ roles where sponsorship is a non-issue — turn it off; the rest of the system w
 | `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` argument. |
 | `MCP_JSA_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
 | `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files/*`, and the dashboard. **Required** to bind to anything other than localhost — without it, a non-localhost bind refuses to start (default-deny). See [Security model](#security-model). |
-| `MCP_JSA_SAMPLING` | `true` | Prefer MCP sampling (the connected client's model — no API key) for `api`/batch scoring. Set `false` to force the BYO-key path. |
-| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key **fallback** for `api`/batch paths when the client can't sample: `gemini`, `deepseek`, `none` |
+| `MCP_JSA_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **when the connected client advertises it** (most, incl. Claude Desktop, don't — then the BYO key is used). Set `false` to always use the BYO key. |
+| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client doesn't support sampling (the common case): `gemini`, `deepseek`, `none` |
 | `MCP_JSA_LLM_MODEL` | _empty_ | Provider-specific model id |
-| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials (only needed when sampling is unavailable) |
+| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials — needed for `api`/batch scoring unless your client supports MCP sampling (most don't; `mode="chat"` never needs a key) |
 | `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
 
 A working starter is at `.env.example`.

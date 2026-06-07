@@ -15,8 +15,13 @@ export const doctorTool = defineTool({
     + '(bundled vs project-root overrides), visa scoring, public base URL, Chromium, Node, and '
     + 'config files. Mutates nothing — safe to call anytime to see how the server is wired.',
   inputSchema: {},
-  handler: async () => {
-    const report = await runDoctorChecks({ context: 'server' });
+  handler: async (_args, ctx) => {
+    // Report the LIVE sampling state negotiated with THIS connected client, not a guess.
+    const b = ctx?.bridge;
+    const sampling = b
+      ? { clientConnected: b.clientConnected(), advertised: b.clientAdvertisedSampling(), usable: b.canSample() }
+      : undefined;
+    const report = await runDoctorChecks({ context: 'server', sampling });
     return okResult(report);
   },
 });

@@ -190,10 +190,10 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 | `MCP_JSA_TEMPLATE_DIR` | _empty_ | User theme dir; overrides bundled themes of the same name |
 | `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used by `render_pdf` when no `template` arg given |
 | `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files`, dashboard. **Required** for non-localhost bind |
-| `MCP_JSA_SAMPLING` | `true` | Prefer MCP sampling for `api`/batch scoring; `false` forces BYO key |
-| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key fallback for scoring: `gemini` / `deepseek` / `none` |
+| `MCP_JSA_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **if the client advertises it** (most, incl. Claude Desktop, don't → BYO key used); `false` always uses BYO key |
+| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client lacks sampling (the common case): `gemini` / `deepseek` / `none` |
 | `MCP_JSA_LLM_MODEL` | _empty_ | Provider model id |
-| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials (only needed when sampling is unavailable) |
+| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials — needed for `api`/batch unless the client supports sampling (most don't); `mode="chat"` never needs a key |
 | `MCP_JSA_VISA_SCORING` | `true` | `false` drops visa from the rubric + hides the visa tools |
 | `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
 
@@ -315,14 +315,22 @@ LaTeX backtrace). `.docx` is generated programmatically and does not use themes.
 All three are **capability-gated**: the server only uses a feature if the connected client
 advertises it; otherwise it falls back to pre-existing paths.
 
-### MCP sampling — scoring without an API key
-`batch_evaluate` and `evaluate_job mode="api"` prefer **MCP sampling**: the server asks the
-**connected client's own model** for the completion (same rubric, same strict-JSON contract).
-- Selection order: **sampling → BYO key (`MCP_JSA_LLM_PROVIDER` + key) → chat mode**.
+### MCP sampling — scoring without an API key (only if the client supports it)
+`batch_evaluate` and `evaluate_job mode="api"` can run on the **connected client's own model**
+via **MCP sampling** (same rubric, same strict-JSON contract) — **but only if that client
+advertises the `sampling` capability** in its initialize handshake.
+- ⚠️ **Most clients don't — including Claude Desktop, as of now** (it advertises only its UI
+  extension, never `sampling`). On those, scoring **falls back to the BYO key** — expected and
+  correct. The transport is **not** sufficient on its own; it's a per-client capability.
+  Current support: modelcontextprotocol.io/clients.
+- It engages **automatically if (and only if) a sampling-capable client connects** — no config.
+- Selection order: **sampling (only if advertised) → BYO key (`MCP_JSA_LLM_PROVIDER` + key) → chat mode**.
 - Cost is **client-borne**; `cost_estimate` records sampling calls and flags them $0 server cost.
-- **Transport gate:** sampling is a server→client request, so it works only over a
-  bidirectional transport = **stdio** (e.g. Claude Desktop). Over stateless HTTP it gates off
-  and falls back cleanly (no hang). `MCP_JSA_SAMPLING=false` forces the BYO-key path.
+- **Transport gate (necessary, not sufficient):** sampling is a server→client request, so stdio
+  is required (stateless HTTP can't deliver it and never tries) — but a stdio client still must
+  advertise `sampling`. `MCP_JSA_SAMPLING=false` forces the BYO-key path.
+- Run the **`doctor` tool** for the LIVE state: "sampling not advertised by current client →
+  using BYO key" vs "sampling available → key optional".
 
 ### MCP elicitation — structured input instead of YAML editing
 - `update_profile` uses **form-mode elicitation** to collect identity fields + taglines,

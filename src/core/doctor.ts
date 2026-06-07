@@ -43,7 +43,20 @@ function pkgInfo(): { name: string; version: string } {
   }
 }
 
-export async function runDoctorChecks(opts: { context: DoctorContext }): Promise<DoctorReport> {
+/**
+ * Live sampling state negotiated with the connected client (from the initialize handshake).
+ * Supplied by the `doctor` MCP tool (which has the ClientBridge). Omitted by the CLI, where
+ * no client is connected — then the report gives the general "depends on your client" guidance.
+ */
+export interface SamplingState {
+  clientConnected: boolean;   // a client finished initialize
+  advertised:      boolean;   // that client advertised the `sampling` capability
+  usable:          boolean;   // sampling can actually be used now (advertised + deliverable transport)
+}
+
+export async function runDoctorChecks(
+  opts: { context: DoctorContext; sampling?: SamplingState },
+): Promise<DoctorReport> {
   const ctx = opts.context;
   const checks: DoctorCheck[] = [];
   const add = (c: DoctorCheck) => checks.push(c);
@@ -106,10 +119,32 @@ export async function runDoctorChecks(opts: { context: DoctorContext }): Promise
     });
   }
 
-  // 5. Sampling posture (how api-path scoring runs). Read the resolved config flag.
-  add(config.samplingEnabled
-    ? { id: 'sampling', label: 'Scoring', status: 'pass', detail: 'MCP sampling preferred (client model — no key); BYO key is the fallback. Sampling/elicitation need a stdio client (e.g. Claude Desktop); HTTP clients use the fallback paths.' }
-    : { id: 'sampling', label: 'Scoring', status: 'warn', detail: 'sampling disabled (MCP_JSA_SAMPLING=false) — api/batch paths require a BYO LLM key.' });
+  // 5. Sampling posture (how api/batch scoring runs). MCP sampling is used ONLY when the
+  // connected client advertises the `sampling` capability in its initialize handshake — the
+  // transport (stdio vs HTTP) is not sufficient on its own, and most clients (including
+  // Claude Desktop, as of now) do NOT advertise it. When they don't, scoring uses the BYO key.
+  const CLIENTS_DOC = 'see modelcontextprotocol.io/clients for current sampling support';
+  if (!config.samplingEnabled) {
+    add({ id: 'sampling', label: 'Scoring', status: 'warn',
+          detail: 'MCP sampling disabled (MCP_JSA_SAMPLING=false) — batch/api scoring requires a BYO LLM key (Gemini/DeepSeek).' });
+  } else if (opts.sampling) {
+    // Server tool: report the LIVE negotiated state with the connected client.
+    const s = opts.sampling;
+    if (s.usable) {
+      add({ id: 'sampling', label: 'Scoring', status: 'pass',
+            detail: 'MCP sampling available — the connected client advertised the sampling capability, so batch/api scoring runs on its model (LLM key optional).' });
+    } else if (s.clientConnected) {
+      add({ id: 'sampling', label: 'Scoring', status: 'pass',
+            detail: `MCP sampling NOT advertised by the current client (e.g. Claude Desktop, as of now) → batch/api scoring uses the BYO key (Gemini/DeepSeek). This is expected; ${CLIENTS_DOC}.` });
+    } else {
+      add({ id: 'sampling', label: 'Scoring', status: 'pass',
+            detail: `No client connected yet — sampling engages only if the connected client advertises it; otherwise batch/api scoring uses the BYO key. ${CLIENTS_DOC}.` });
+    }
+  } else {
+    // Cold start (CLI): no client to negotiate with — give the general rule, no assumptions.
+    add({ id: 'sampling', label: 'Scoring', status: 'pass',
+          detail: `MCP sampling engages automatically IF the connected client advertises the sampling capability (the transport alone is not enough). Most clients — including Claude Desktop, as of now — do NOT, so batch/api scoring needs a BYO key (Gemini/DeepSeek). ${CLIENTS_DOC}.` });
+  }
 
   // 6. Visa scoring.
   add({ id: 'visa', label: 'Visa scoring', status: 'pass',

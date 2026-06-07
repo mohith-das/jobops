@@ -3,7 +3,11 @@
 // Historically there were two rating paths: chat-mode (the connected chat scores, no key)
 // and api-mode (a BYO Gemini/DeepSeek key scores server-side). MCP sampling collapses these:
 // the server asks the *connected client's* model for the completion — same rubric, same
-// strict-JSON contract — so no separate key is needed and one code path serves both.
+// strict-JSON contract — so no separate key is needed WHEN the client supports sampling.
+// Caveat: sampling is used only if the connected client advertised the `sampling` capability
+// in its initialize handshake. Most clients (including Claude Desktop, as of now) do NOT, so
+// in practice batch/api scoring usually falls back to the BYO key. See
+// modelcontextprotocol.io/clients for current support.
 //
 // A `Completer` is "give me a strict-JSON completion for these messages". We have two:
 //   • samplingCompleter(bridge)  — routes through MCP sampling (client-borne cost);

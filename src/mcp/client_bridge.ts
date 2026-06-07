@@ -79,6 +79,10 @@ export interface ClientBridge {
   canSample():    boolean;
   canElicit():    boolean;   // form-mode elicitation
   canElicitUrl(): boolean;   // URL-mode elicitation (2025-11-25)
+  /** True once the connected client has completed the initialize handshake. */
+  clientConnected(): boolean;
+  /** Whether the connected client advertised the `sampling` capability in initialize. */
+  clientAdvertisedSampling(): boolean;
   sample(req: SampleRequest):          Promise<SampleResponse>;
   elicitForm(req: ElicitFormRequest):  Promise<ElicitResponse>;
   elicitUrl(req: ElicitUrlRequest):    Promise<ElicitResponse>;
@@ -101,6 +105,12 @@ export class RealClientBridge implements ClientBridge {
   canSample(): boolean    { return isDuplexCapable() && !!this.caps()?.sampling; }
   canElicit(): boolean    { return isDuplexCapable() && !!(this.caps()?.elicitation as any)?.form; }
   canElicitUrl(): boolean { return isDuplexCapable() && !!(this.caps()?.elicitation as any)?.url; }
+
+  // getClientCapabilities() is undefined until the client finishes initialize, then an
+  // object (possibly empty) carrying exactly what the client advertised. So a defined value
+  // means "connected", and `.sampling` reflects the LIVE negotiated capability — not a guess.
+  clientConnected(): boolean          { return this.caps() !== undefined; }
+  clientAdvertisedSampling(): boolean { return !!this.caps()?.sampling; }
 
   async sample(req: SampleRequest): Promise<SampleResponse> {
     const result = await this.server.server.createMessage({
@@ -142,6 +152,8 @@ export const NULL_BRIDGE: ClientBridge = {
   canSample:    () => false,
   canElicit:    () => false,
   canElicitUrl: () => false,
+  clientConnected:          () => false,
+  clientAdvertisedSampling: () => false,
   sample:    async () => { throw new Error('no MCP client connected (sampling unavailable)'); },
   elicitForm: async () => { throw new Error('no MCP client connected (elicitation unavailable)'); },
   elicitUrl:  async () => { throw new Error('no MCP client connected (elicitation unavailable)'); },

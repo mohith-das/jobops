@@ -44,6 +44,12 @@ test('connect emits a config block for every client, all pointing at ONE shared 
   assert.match(out, /stdio mode — single-client alternative \(NOT shared\)/);
   assert.match(out, /EADDRINUSE/);
 
+  // The mcp-remote × Node >= 26 known-issue warning must ship with the Desktop bridge
+  // config — without it, Homebrew-Node users hit "Unexpected content type: null" blind.
+  assert.match(out, /KNOWN ISSUE: mcp-remote/);
+  assert.match(out, /Node >= 26/);
+  assert.match(out, /Unexpected content\s*\n?\s*type: null/);
+
   // No token set on localhost → the auth guidance is shown instead of headers.
   assert.match(out, /MUST set\s*\n?\s*MCP_JSA_AUTH_TOKEN/);
   assert.doesNotMatch(out, /Authorization: Bearer/);

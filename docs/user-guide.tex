@@ -447,6 +447,8 @@ Verify all clients hit the same instance with \cmd{npx job\_ops-mcp status} (fla
 
 \textbf{Auth:} the moment the server is reachable beyond localhost it MUST run with \env{MCP\_JSA\_AUTH\_TOKEN} set (\S\ref{sec:security}) \textemdash{} it serves PII to every connected endpoint and refuses to boot remotely without the token. The token goes into each client's config; \cmd{connect} embeds it automatically when the env var is set.
 
+\textbf{Known issue (mcp-remote \texttimes{} Node $\geq$ 26):} \texttt{mcp-remote} ($\leq$ 0.1.38) fails under Node 26+ with \texttt{Unexpected content type: null} \textemdash{} its bundled undici \texttt{EnvHttpProxyAgent} global dispatcher strips response headers from Node's built-in \texttt{fetch}. The server's responses are spec-correct; the bridge mangles them client-side. Until fixed upstream, run the bridge under Node $\leq$ 24: replace \texttt{"command": "npx"} with an absolute path to a Node 24 binary and point \texttt{args} at a Node-24-installed \texttt{mcp-remote}. The symptom appears in Claude Desktop's \fpath{mcp-server-*.log} right after \texttt{Using transport strategy: http-first}.
+
 Below are the two configs you most likely want to paste by hand. The stdio config is the \emph{single-client} alternative: it spawns a private server inside Claude Desktop rather than connecting to the shared one (next to a running shared server it also needs its own \env{MCP\_JSA\_PORT}, or its file server fails with \texttt{EADDRINUSE}).
 
 \subsubsection*{Claude Desktop (stdio transport — single-client alternative)}

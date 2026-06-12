@@ -445,6 +445,12 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
 - **`EADDRINUSE` on (re)start** — a previous server still holds the port. Find and kill it:
   `lsof -nP -iTCP:7891 -sTCP:LISTEN` then `kill <PID>` (or change `MCP_JSA_PORT`). With
   Claude Desktop, fully quit the app so it stops the old stdio child before relaunch.
+- **mcp-remote bridge dies with `Unexpected content type: null`** — known upstream bug,
+  NOT this server: mcp-remote (≤ 0.1.38) under Node ≥ 26 — its bundled undici
+  `EnvHttpProxyAgent` global dispatcher strips response headers from Node's built-in
+  fetch. Fix: run the bridge under Node ≤ 24 (absolute path to a Node 24 binary +
+  Node-24-installed mcp-remote in the client config). Affects ANY streamable-HTTP server
+  behind mcp-remote, which is how to tell it apart from a real server issue.
 - **`doctor` says "cv.md was edited after the last reseed"** — your packet is stale. Run
   `reseed` (CLI `npx job_ops-mcp reseed`, or the `reseed_career_packet` tool).
 - **`doctor` fails on config files / wrong directory** — `doctor`/`start` resolve files from

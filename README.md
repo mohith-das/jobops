@@ -340,6 +340,15 @@ Rate-limited in one client? Switch to another — nothing is lost.
 | **LibreChat** | `librechat.yaml` → `type: streamable-http` (see below for Docker) |
 | **Web UI / browser** | the tracker dashboard at `/` is the same server, same DB |
 
+> **Known issue (mcp-remote × Node ≥ 26):** `mcp-remote` (≤ 0.1.38) fails under Node 26+
+> with `StreamableHTTPError: Unexpected content type: null` — its bundled undici
+> `EnvHttpProxyAgent` global dispatcher strips response headers from Node's built-in
+> `fetch`. The server's responses are spec-correct; the bridge mangles them client-side.
+> Until fixed upstream, run the bridge under Node ≤ 24: replace `"command": "npx"` with
+> an absolute path to a Node 24 binary and point `args` at a Node-24-installed
+> `mcp-remote` (`npm i -g mcp-remote` under that Node). Symptom appears in Claude
+> Desktop's `mcp-server-*.log` right after `Using transport strategy: http-first`.
+
 Concurrency is safe by design: each HTTP request gets an isolated MCP protocol
 instance, reads run concurrently (SQLite WAL), and **all writes are serialized through
 one write lock** in the single server process — no corruption under multi-client load,

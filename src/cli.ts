@@ -272,6 +272,12 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     'Claude Desktop config files only launch stdio servers, so bridge stdio→HTTP with\n' +
     'mcp-remote — Desktop talks stdio to the bridge; the bridge talks to the ONE shared server.\n' +
     '(Alternative on paid plans: Settings → Connectors → "Add custom connector" with the URL.)\n'));
+  console.log(c.yellow(
+    'KNOWN ISSUE: mcp-remote (<= 0.1.38) fails under Node >= 26 with "Unexpected content\n' +
+    'type: null" — its bundled undici EnvHttpProxyAgent global dispatcher strips response\n' +
+    'headers from Node\'s built-in fetch. The server is NOT at fault. Until fixed upstream,\n' +
+    'run the bridge under Node <= 24, e.g. swap "command": "npx" for an absolute path to a\n' +
+    'Node 24 binary and point args at a Node-24-installed mcp-remote.\n'));
   console.log(JSON.stringify({
     mcpServers: {
       'job_ops-mcp': {
@@ -300,7 +306,8 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     `url = "${url}"`,
     ...(token ? [`bearer_token_env_var = "MCP_JSA_AUTH_TOKEN"`] : []),
   ].join('\n'));
-  console.log(c.dim('Older codex builds without streamable-HTTP support can bridge instead:\n' +
+  console.log(c.dim('Older codex builds without streamable-HTTP support can bridge instead\n' +
+    '(same mcp-remote Node <= 24 caveat as the Claude Desktop section):\n' +
     `  [mcp_servers.job_ops_mcp]\n  command = "npx"\n  args = ["-y", "mcp-remote", "${url}"${token ? `, "--header", "Authorization: Bearer ${token}"` : ''}]`));
 
   // ── gemini-cli ─────────────────────────────────────────────────────────────

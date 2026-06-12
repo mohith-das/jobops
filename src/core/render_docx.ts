@@ -16,7 +16,8 @@ import {
   PageOrientation, convertInchesToTwip,
 } from 'docx';
 
-import { parseCV, type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
+import { type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
+import { cvForRender } from './render_source.js';
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -26,15 +27,22 @@ export interface CoverDocxFields {
   location: string;
 }
 
+export interface BuildDocxOpts {
+  /** Overlay this job's persisted tailored materials onto the content. */
+  job_id?: string;
+  /** Pre-computed content (wins over job_id) — lets one tool call share one snapshot across formats. */
+  cv?:     CVData;
+}
+
 /** Build the resume .docx (returns a Buffer ready for fs.writeFileSync). */
-export async function buildResumeDocx(): Promise<Buffer> {
-  const cv = parseCV();
+export async function buildResumeDocx(opts: BuildDocxOpts = {}): Promise<Buffer> {
+  const cv = opts.cv ?? cvForRender(opts.job_id);
   return Packer.toBuffer(resumeDocument(cv));
 }
 
 /** Build the cover letter .docx. */
-export async function buildCoverDocx(args: CoverDocxFields): Promise<Buffer> {
-  const cv = parseCV();
+export async function buildCoverDocx(args: CoverDocxFields, opts: BuildDocxOpts = {}): Promise<Buffer> {
+  const cv = opts.cv ?? cvForRender(opts.job_id);
   return Packer.toBuffer(coverDocument(cv, args));
 }
 

@@ -11,7 +11,8 @@ import { randomUUID } from 'node:crypto';
 import type { Browser } from 'playwright';
 
 import { config } from '../config.js';
-import { parseCV, type CVData } from './cv_parse.js';
+import { type CVData } from './cv_parse.js';
+import { cvForRender } from './render_source.js';
 import { getJob } from './jobs.js';
 import { escapeHtml } from './html.js';
 import { scanForVisaLeakage } from './outreach_safety.js';
@@ -39,6 +40,8 @@ export interface RenderArgs {
   page_format?: 'a4' | 'letter';
   /** Theme name (see core/templates.ts). Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
   theme?: string;
+  /** Pre-computed content (defaults to cvForRender(job_id)) — lets one tool call share one snapshot across formats. */
+  cv?: CVData;
 }
 
 export interface RenderedFile {
@@ -61,7 +64,8 @@ export async function renderPdf(args: RenderArgs): Promise<RenderedFile[]> {
   }
   const format = args.page_format ?? 'letter';
   const theme  = args.theme ?? effectiveDefaultTemplate();
-  const cv = parseCV();
+  // Current content for THIS render: cv.md/packet + this job's tailored materials.
+  const cv = args.cv ?? cvForRender(args.job_id);
 
   const outputs: RenderedFile[] = [];
   const browser = await getSharedBrowser();

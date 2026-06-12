@@ -1,9 +1,10 @@
 // render_pdf — produces resume + cover artifacts in any subset of {pdf, tex, docx}.
 //
 // PDF is rendered via the existing HTML→Chromium pipeline (templates/cv-template.html
-// + Playwright). .tex and .docx are generated from the same parsed CV so the
-// content matches exactly across formats — editing and recompiling the .tex
-// reproduces the same document.
+// + Playwright). All formats are generated from ONE content snapshot taken at the
+// start of the call (cvForRender: cv.md + active career packet + this job's
+// tailored materials) so the content matches exactly across formats — editing
+// and recompiling the .tex reproduces the same document.
 //
 // The visa-leakage scan runs against the *source text* for every format before any
 // file is written. .tex content is grep-able directly. For .docx (binary OOXML)
@@ -22,6 +23,7 @@ import { defineTool, okResult, errResult } from '../define.js';
 import { renderPdf, type RenderedFile } from '../../core/render.js';
 import { buildResumeTex, buildCoverTex, type CoverFields } from '../../core/render_tex.js';
 import { buildResumeDocx, buildCoverDocx, type CoverDocxFields } from '../../core/render_docx.js';
+import { cvForRender } from '../../core/render_source.js';
 import { getJob } from '../../core/jobs.js';
 import { parseCV } from '../../core/cv_parse.js';
 import { scanForVisaLeakage } from '../../core/outreach_safety.js';
@@ -90,6 +92,11 @@ export const renderPdfTool = defineTool({
       try { resolveTheme(themeName); }
       catch (err: any) { return errResult(err?.message ?? String(err)); }
 
+      // Snapshot the render-time content ONCE per call — cv.md/profile.yml, the
+      // active career packet, and THIS job's persisted tailored materials — so
+      // every requested format shares the same (current) tailored content.
+      const cv = cvForRender(args.job_id);
+
       const artifacts: RenderedArtifact[] = [];
 
       // PDF path — runs first because it brings up Playwright once for both kinds.
@@ -100,6 +107,7 @@ export const renderPdfTool = defineTool({
           cover_body:  args.cover_body,
           page_format: args.page_format,
           theme:       themeName,
+          cv,
         });
         for (const f of pdfFiles) {
           artifacts.push({ kind: f.kind, format: 'pdf', path: f.path, url: f.url, bytes: f.bytes });
@@ -108,10 +116,10 @@ export const renderPdfTool = defineTool({
 
       // .tex path — pure text, fast.
       if (formats.includes('tex')) {
-        if (kinds.includes('resume')) artifacts.push(await writeText('tex', 'resume', args.job_id, job.title, buildResumeTex({ theme: themeName })));
+        if (kinds.includes('resume')) artifacts.push(await writeText('tex', 'resume', args.job_id, job.title, buildResumeTex({ theme: themeName, cv })));
         if (kinds.includes('cover')) {
           if (!args.cover_body) throw new Error('cover_body required when kind includes cover');
-          const tex = buildCoverTex({ body: args.cover_body, company: cover_company, location: cover_location }, { theme: themeName });
+          const tex = buildCoverTex({ body: args.cover_body, company: cover_company, location: cover_location }, { theme: themeName, cv });
           // Whole-file visa scan for the .tex — defense in depth (cover_body already
           // scanned upstream, but the resume.tex might inadvertently inherit terms).
           const leaks = scanForVisaLeakage(tex);
@@ -123,7 +131,7 @@ export const renderPdfTool = defineTool({
       // .docx path — binary, generated programmatically.
       if (formats.includes('docx')) {
         if (kinds.includes('resume')) {
-          const buf = await buildResumeDocx();
+          const buf = await buildResumeDocx({ cv });
           // Visa scan was already applied to inputs (parsed cv.md, profile.yml) earlier
           // in the materials flow. The docx body is sourced entirely from those.
           artifacts.push(await writeBinary('docx', 'resume', args.job_id, job.title, buf));
@@ -131,7 +139,7 @@ export const renderPdfTool = defineTool({
         if (kinds.includes('cover')) {
           if (!args.cover_body) throw new Error('cover_body required when kind includes cover');
           const fields: CoverDocxFields = { body: args.cover_body, company: cover_company, location: cover_location };
-          const buf = await buildCoverDocx(fields);
+          const buf = await buildCoverDocx(fields, { cv });
           artifacts.push(await writeBinary('docx', 'cover', args.job_id, job.title, buf));
         }
       }

@@ -353,6 +353,55 @@ export function syncPacketToSourceFiles(): SyncBackResult {
 
   // ── Build cv.md from Sections 3–8 ──
   const { profile } = loadProjectFiles();
+  const { markdown: cvMarkdown, roles, projects, skills, education } =
+    cvMarkdownFromPacket(active.content, profile);
+  const cvPath = pathInProject('cv.md');
+  mkdirSync(dirname(cvPath), { recursive: true });
+  writeFileSync(cvPath, cvMarkdown, 'utf-8');
+
+  // ── Write Section 1 identity (merge) + Section 2 taglines (replace) → profile.yml ──
+  const profilePath = pathInProject('config', 'profile.yml');
+  const raw = readIfExists(profilePath);
+  const base: any = raw ? (yaml.load(raw) ?? {}) : {};
+
+  const identity = parseIdentity(sections.get('1.') ?? '');
+  let identityFields = 0;
+  if (Object.keys(identity).length) {
+    base.candidate = base.candidate ?? {};
+    for (const [k, v] of Object.entries(identity)) {
+      if (v && v.trim()) { base.candidate[k] = v.trim(); identityFields++; }
+    }
+  }
+
+  const taglineMap = parseTaglines(sections.get('2.') ?? '');
+  const taglineCount = Object.keys(taglineMap).length;
+  if (taglineCount) base.taglines = taglineMap;   // REPLACE so removed taglines don't resurrect on reseed
+
+  mkdirSync(dirname(profilePath), { recursive: true });
+  writeFileSync(profilePath, yaml.dump(base, { lineWidth: 100, noRefs: true }), 'utf-8');
+
+  return {
+    cv_path: cvPath, profile_path: profilePath, cv_bytes: cvMarkdown.length,
+    roles, projects, skills, education, taglines: taglineCount, identity_fields: identityFields,
+  };
+}
+
+export interface PacketCvMarkdown {
+  markdown:  string;
+  roles:     number;
+  projects:  number;
+  skills:    number;
+  education: number;
+}
+
+/**
+ * Render a packet's Sections 3–8 as cv.md-grammar markdown (parseCV-compatible).
+ * Shared by syncPacketToSourceFiles (which writes it to cv.md) and the render
+ * pipeline (which parses it in memory so a chat-edited packet reaches renders
+ * without requiring an explicit sync-back first).
+ */
+export function cvMarkdownFromPacket(packetContent: string, profile: Profile | null): PacketCvMarkdown {
+  const sections = splitNumberedSections(packetContent);
   const name = (profile?.candidate?.full_name) || parseIdentity(sections.get('1.') ?? '').full_name || 'Candidate';
   const headline = (profile?.narrative as any)?.headline as string | undefined;
 
@@ -382,36 +431,11 @@ export function syncPacketToSourceFiles(): SyncBackResult {
   if (eduLines.length)     parts.push('## Education\n\n' + eduLines.join('\n') + '\n');
   if (skillLines.length)   parts.push('## Skills\n\n' + skillLines.join('\n') + '\n');
 
-  const cvMarkdown = parts.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
-  const cvPath = pathInProject('cv.md');
-  mkdirSync(dirname(cvPath), { recursive: true });
-  writeFileSync(cvPath, cvMarkdown, 'utf-8');
-
-  // ── Write Section 1 identity (merge) + Section 2 taglines (replace) → profile.yml ──
-  const profilePath = pathInProject('config', 'profile.yml');
-  const raw = readIfExists(profilePath);
-  const base: any = raw ? (yaml.load(raw) ?? {}) : {};
-
-  const identity = parseIdentity(sections.get('1.') ?? '');
-  let identityFields = 0;
-  if (Object.keys(identity).length) {
-    base.candidate = base.candidate ?? {};
-    for (const [k, v] of Object.entries(identity)) {
-      if (v && v.trim()) { base.candidate[k] = v.trim(); identityFields++; }
-    }
-  }
-
-  const taglineMap = parseTaglines(sections.get('2.') ?? '');
-  const taglineCount = Object.keys(taglineMap).length;
-  if (taglineCount) base.taglines = taglineMap;   // REPLACE so removed taglines don't resurrect on reseed
-
-  mkdirSync(dirname(profilePath), { recursive: true });
-  writeFileSync(profilePath, yaml.dump(base, { lineWidth: 100, noRefs: true }), 'utf-8');
-
+  const markdown = parts.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   return {
-    cv_path: cvPath, profile_path: profilePath, cv_bytes: cvMarkdown.length,
-    roles: roleBlocks.length, projects: projectLines.length, skills: skillLines.length,
-    education: eduLines.length, taglines: taglineCount, identity_fields: identityFields,
+    markdown,
+    roles: roleBlocks.length, projects: projectLines.length,
+    skills: skillLines.length, education: eduLines.length,
   };
 }
 

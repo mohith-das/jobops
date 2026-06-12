@@ -61,6 +61,11 @@ and case-sensitive: `{{NAME}}` works, `{{Name}}` is left alone. **A placeholder 
 template doesn't reference is simply ignored — drop a placeholder to drop that
 section.** A placeholder the renderer doesn't fill becomes empty string.
 
+In `.tex` templates, commenting a placeholder out also drops the section: a
+placeholder sitting after an unescaped `%` on its line (e.g. `% {{SUMMARY_SECTION}}`)
+is left verbatim instead of substituted, so you can toggle sections on and off
+without deleting the line.
+
 The content the renderer injects is already **LaTeX-escaped / HTML-escaped** for the
 target format. You should NOT wrap the placeholder in another escape pass.
 

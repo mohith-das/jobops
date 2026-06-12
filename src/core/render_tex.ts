@@ -1,15 +1,17 @@
 // LaTeX source generator for resume + cover letter.
 //
-// Builds self-contained .tex from the parsed CV (CVData from cv_parse.ts) by
-// rendering each section block to a LaTeX string, then substituting those blocks
-// into a chosen theme template (see core/templates.ts). The default theme keeps
+// Builds self-contained .tex from the render-time content (cvForRender — cv.md
+// plus the active packet and the job's tailored materials, read fresh per call)
+// by rendering each section block to a LaTeX string, then substituting those
+// blocks into a chosen theme template (see core/templates.ts). The default theme keeps
 // the original Computer-Modern, ATS-clean look — compatible with vanilla
 // pdflatex on any TeX Live install (no fontspec, no minted, no exotic packages).
 //
 // scanForVisaLeakage() must be called on the returned string by the caller
 // before writing to disk; the rail applies to every output format.
 
-import { parseCV, type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
+import { type CVData, type ExperienceItem, type ProjectItem, type EducationItem, type SkillCategory } from './cv_parse.js';
+import { cvForRender } from './render_source.js';
 import { loadTemplate, fillTemplate, effectiveDefaultTemplate } from './templates.js';
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -23,13 +25,22 @@ export interface CoverFields {
   location: string;
 }
 
-/** Build the resume .tex. `theme` defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
-export function buildResumeTex(opts: { theme?: string } = {}): string {
+export interface BuildTexOpts {
+  /** Theme name. Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+  theme?:  string;
+  /** Overlay this job's persisted tailored materials onto the content. */
+  job_id?: string;
+  /** Pre-computed content (wins over job_id) — lets one tool call share one snapshot across formats. */
+  cv?:     CVData;
+}
+
+/** Build the resume .tex from the current content (cv.md/packet + the job's materials). */
+export function buildResumeTex(opts: BuildTexOpts = {}): string {
   const theme = opts.theme ?? effectiveDefaultTemplate();
   try {
-    const cv  = parseCV();
+    const cv  = opts.cv ?? cvForRender(opts.job_id);
     const tpl = loadTemplate(theme, 'resume.tex');
-    return fillTemplate(tpl.body, resumeValues(cv));
+    return fillTemplate(tpl.body, resumeValues(cv), { comments: 'latex' });
   } catch (err: any) {
     // Wrap any downstream error with the theme name so it isn't cryptic.
     throw new Error(`render_tex (theme="${theme}"): ${err?.message ?? err}`);
@@ -37,12 +48,12 @@ export function buildResumeTex(opts: { theme?: string } = {}): string {
 }
 
 /** Build the cover .tex. `theme` defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
-export function buildCoverTex(args: CoverFields, opts: { theme?: string } = {}): string {
+export function buildCoverTex(args: CoverFields, opts: BuildTexOpts = {}): string {
   const theme = opts.theme ?? effectiveDefaultTemplate();
   try {
-    const cv  = parseCV();
+    const cv  = opts.cv ?? cvForRender(opts.job_id);
     const tpl = loadTemplate(theme, 'cover.tex');
-    return fillTemplate(tpl.body, coverValues(cv, args));
+    return fillTemplate(tpl.body, coverValues(cv, args), { comments: 'latex' });
   } catch (err: any) {
     throw new Error(`render_tex cover (theme="${theme}"): ${err?.message ?? err}`);
   }

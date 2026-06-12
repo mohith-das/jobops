@@ -59,6 +59,11 @@ const SECTION_HEADERS = [
 
 export function parseCV(): CVData {
   const { cvMd, profile } = loadProjectFiles();
+  return parseCVText(cvMd, profile);
+}
+
+/** Parse arbitrary cv.md-grammar markdown (not necessarily the cv.md on disk). */
+export function parseCVText(cvMd: string | null, profile: Profile | null): CVData {
   const identity = identityFromProfile(profile);
   const empty: CVData = {
     ...identity,

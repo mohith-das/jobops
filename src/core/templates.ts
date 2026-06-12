@@ -15,6 +15,8 @@
 // renderer pre-builds the LaTeX/HTML for each block and substitutes them in.
 // Placeholders the renderer doesn't fill stay as empty strings (graceful
 // degradation — drop a placeholder from your template to drop that section).
+// In .tex templates, commenting a placeholder out (`% {{SUMMARY_SECTION}}`)
+// drops the section too — substitution skips LaTeX comments.
 // Placeholders the *template* doesn't reference are simply not used.
 //
 // Structural sanity checks (`validateTemplate`) catch the obvious malformed
@@ -138,16 +140,45 @@ export function loadTemplate(themeName: string, filename: TemplateFormat): Resol
   return { body, theme, filename };
 }
 
+export interface FillOptions {
+  /**
+   * 'latex' — a placeholder sitting after an unescaped `%` on its line is inside
+   * a LaTeX comment: leave it verbatim instead of substituting. Substituted
+   * values are often multi-line, so expanding inside a comment would let every
+   * line after the first escape the comment — a commented-out placeholder must
+   * genuinely drop the section.
+   */
+  comments?: 'latex';
+}
+
 /**
  * Substitute `{{KEY}}` placeholders. Keys not present in `values` are replaced
  * with empty string (degrade gracefully). Values not referenced by the template
  * are ignored. The order of substitution is deterministic so that a value
  * containing `{{X}}` does not re-trigger a second pass.
  */
-export function fillTemplate(body: string, values: Record<string, string>): string {
+export function fillTemplate(body: string, values: Record<string, string>, opts: FillOptions = {}): string {
   // Single-pass: split on placeholder regex, substitute matched keys, reassemble.
   // This guarantees a value containing "{{FOO}}" is treated as literal text.
-  return body.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => values[key] ?? '');
+  return body.replace(/\{\{([A-Z0-9_]+)\}\}/g, (match, key, offset) => {
+    if (opts.comments === 'latex' && inLatexComment(body, offset)) return match;
+    return values[key] ?? '';
+  });
+}
+
+/** True when `offset` falls after an unescaped `%` on its line (LaTeX comment). */
+function inLatexComment(body: string, offset: number): boolean {
+  const lineStart = body.lastIndexOf('\n', offset - 1) + 1;
+  const prefix = body.slice(lineStart, offset);
+  for (let i = 0; i < prefix.length; i++) {
+    if (prefix[i] !== '%') continue;
+    // `\%` is an escaped percent, not a comment — but `\\%` is a line break
+    // followed by a real comment. Odd backslash count = escaped.
+    let backslashes = 0;
+    for (let j = i - 1; j >= 0 && prefix[j] === '\\'; j--) backslashes++;
+    if (backslashes % 2 === 0) return true;
+  }
+  return false;
 }
 
 /**

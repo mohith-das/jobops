@@ -4,9 +4,19 @@
 // the per-request setup is microseconds and the lifecycle is dramatically simpler than
 // session-based mode (no Map<sessionId, transport>, no GC).
 //
+// MULTI-CLIENT SAFETY: the fresh-per-request server is load-bearing, not a style
+// choice. The SDK's Protocol holds ONE transport reference — a single McpServer
+// shared across overlapping requests would route client A's response through
+// client B's connection. A fresh server per request gives every concurrent
+// client (Claude Desktop, Claude Code, opencode, codex, …) an isolated protocol
+// instance over the same shared tool implementations + one SQLite DB.
+//
 // Tool registration follows src/mcp/define.ts — every tool exports a single ToolDef.
 // To add a tool: write src/mcp/tools/<name>.ts that exports `<name>Tool`, import it
 // below, and add it to ALL_TOOLS. resources/list comes from src/core/resources.ts.
+
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -15,6 +25,7 @@ import type { Express, Request, Response } from 'express';
 
 import { config } from '../config.js';
 import { listResources } from '../core/resources.js';
+import { recordClientInitialize, recordMcpRequest } from '../core/server_status.js';
 import { registerTools, type AnyToolDef } from './define.js';
 import { setDuplexCapable } from './client_bridge.js';
 
@@ -97,32 +108,58 @@ const ALL_TOOLS: AnyToolDef[] = config.visaScoringEnabled
   ? FULL_TOOLSET
   : FULL_TOOLSET.filter(t => !VISA_TOOL_NAMES.has(t.name));
 
-// Tools and resources are static — one McpServer instance is reused across all requests.
-// Only the transport is per-request in stateless mode.
-let _server: McpServer | null = null;
-function getMcpServer(): McpServer {
-  if (_server) return _server;
-  _server = new McpServer({ name: 'mcp-jsa', version: '0.2.0' });
-  registerTools(_server, ALL_TOOLS);
+function pkgVersion(): string {
+  try {
+    return JSON.parse(readFileSync(resolve(config.installDir, 'package.json'), 'utf-8')).version ?? '0.0.0';
+  } catch { return '0.0.0'; }
+}
+const PKG_VERSION = pkgVersion();
+
+// Tools and resources are static, but each protocol instance must be fresh — see the
+// multi-client note in the header. Registration is microseconds; correctness first.
+function buildMcpServer(): McpServer {
+  const server = new McpServer({ name: 'mcp-jsa', version: PKG_VERSION });
+  registerTools(server, ALL_TOOLS);
   for (const r of listResources()) {
-    _server.registerResource(
+    server.registerResource(
       r.name, r.uri,
       { title: r.title, description: r.description, mimeType: r.mimeType },
       async () => ({ contents: [{ uri: r.uri, mimeType: r.mimeType, text: r.body() }] }),
     );
   }
-  return _server;
+  return server;
+}
+
+/** Best-effort client tracking for /api/status + the CLI `status` command. */
+function recordRequestForStatus(req: Request): void {
+  recordMcpRequest();
+  const body = req.body;
+  const messages = Array.isArray(body) ? body : [body];
+  for (const m of messages) {
+    if (m && typeof m === 'object' && m.method === 'initialize') {
+      const info = m.params?.clientInfo ?? {};
+      recordClientInitialize({
+        name:    typeof info.name === 'string' ? info.name : undefined,
+        version: typeof info.version === 'string' ? info.version : undefined,
+        remote:  req.ip,
+      });
+    }
+  }
 }
 
 export function mountMcp(app: Express, path = '/mcp'): void {
-  const server = getMcpServer();
   const handle = async (req: Request, res: Response) => {
+    recordRequestForStatus(req);
+    // Fresh server + transport per request — complete isolation between
+    // concurrent clients (one shared instance would cross-route responses).
+    const server = buildMcpServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
     res.on('close', () => {
       transport.close().catch(() => undefined);
+      server.close().catch(() => undefined);
     });
     try {
       await server.connect(transport);
@@ -154,7 +191,9 @@ export async function serveStdio(): Promise<void> {
   // elicitation) can actually be delivered. The HTTP transport (stateless + JSON) cannot,
   // so it leaves this false and those features gate off → clients fall back gracefully.
   setDuplexCapable(true);
-  const server = getMcpServer();
+  recordClientInitialize({ name: 'stdio-client', version: '?', remote: 'stdio' });
+  // stdio is exactly one client for the process lifetime — a single instance is safe here.
+  const server = buildMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // Server runs until transport closes; transport.onclose fires when stdin EOFs.

@@ -15,6 +15,7 @@ import { getDb } from './db.js';
 import { ensureActiveCareerPacket, loadProjectFiles } from './core/profile.js';
 import { closeBrowser } from './core/render.js';
 import { shutdownScanResources } from './core/scan_engine.js';
+import { setTransportMode } from './core/server_status.js';
 import { applyState as applySchedulerState, readEnabledJobs } from './core/scheduler.js';
 
 export interface BootOptions {
@@ -58,6 +59,7 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
   const app = buildHttpApp();
   // In stdio mode we DON'T mount /mcp — MCP rides stdin/stdout instead.
   // The Express server still runs so /files/* artifact links resolve.
+  setTransportMode(opts.stdio ? 'stdio' : 'http');
   if (!opts.stdio) {
     mountMcp(app, '/mcp');
   }

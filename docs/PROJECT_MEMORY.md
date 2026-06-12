@@ -39,9 +39,24 @@ Three planes in one process:
 1. **MCP plane** — tools + resources, over **stdio** (e.g. Claude Desktop) or
    **streamable-HTTP** (e.g. LibreChat, Cursor).
 2. **HTTP plane** — a file server (`/files/*` for rendered artifacts), a tracker dashboard
-   (`/`) + soft-delete `/trash` page + `/api/*` CRUD endpoints, `/healthz`, and the `/mcp`
-   endpoint. One port serves all of it.
+   (`/`) + soft-delete `/trash` page + `/api/*` CRUD endpoints (incl. `/api/status` server
+   identity), `/healthz`, and the `/mcp` endpoint. One port serves all of it.
 3. **Data plane** — a local **SQLite** DB (WAL mode) that holds all runtime state.
+
+### Multi-client topology (one server, every client)
+HTTP mode is the first-class **shared** mode: ONE long-running process on ONE port serves
+many concurrent MCP clients (Claude Desktop via mcp-remote, Claude Code, opencode, codex,
+gemini-cli, LibreChat, the web UI) against the one DB — work done in any client is
+instantly visible in all others. Safety model: each HTTP request gets a **fresh MCP
+protocol instance** (`src/mcp/server.ts` — a shared instance would cross-route responses
+between overlapping clients); reads run concurrently under WAL; **all writes serialize
+through `runInWriteLock`** in the single process; `busy_timeout=5000` covers a second
+*process* on the same DB file (e.g. a stdio instance). `npx job_ops-mcp connect` prints
+per-client config; `npx job_ops-mcp status` (or the `doctor` tool) verifies uptime, the
+source-of-truth DB path + fingerprint, and which clients have connected. Beyond localhost,
+`MCP_JSA_AUTH_TOKEN` is mandatory (default-deny) and goes into every client's config.
+stdio mode stays available as the single-client alternative (private process; needs its
+own port next to a running shared server).
 
 ### SQLite schema (overview)
 Key tables: `companies`, `company_aliases` (legal-name variants), `target_companies`
@@ -112,6 +127,10 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   persisting.
 - `render_pdf` — renders resume/cover. Params: `job_id`, `kind` (`resume|cover|both`),
   `formats` (subset of `["pdf","tex","docx"]`), `template` (theme name). Returns `/files/...` links.
+  All formats share one content snapshot taken at call time (`core/render_source.ts`
+  `cvForRender`): cv.md/profile.yml + the active packet (chat-edited packets win per
+  section) + the job's current `tailored_bullets` — so every render reflects the
+  latest `materials_v` and packet version, never a stale snapshot.
 - `get_report` — fetch a saved eval report (HTML link).
 
 **Tracker**
@@ -255,8 +274,10 @@ npx job_ops-mcp@latest doctor
 npx job_ops-mcp@latest start
 ```
 
-CLI commands: `init`, `start`, `start --stdio`, `reseed`, `templates`, `doctor`, `connect`,
-`help`, `--version`.
+CLI commands: `init`, `start`, `start --stdio`, `reseed`, `templates`, `doctor`, `connect`
+(per-client shared-HTTP config: Claude Desktop/Code, opencode, codex, gemini-cli,
+LibreChat; flags `--host --port --token`), `status` (query a running server: uptime,
+source-of-truth DB + fingerprint, clients seen; flags `--url --token`), `help`, `--version`.
 
 ### Claude Desktop (stdio transport)
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) /
@@ -324,7 +345,9 @@ npx job_ops-mcp templates            # lists bundled + user themes; marks the de
 ```
 The loader checks `MCP_JSA_TEMPLATE_DIR` first, so a `default/` folder there overrides the
 bundled default; brand-new themes are also picked up. A theme missing a placeholder drops
-that section gracefully. A malformed theme errors with the theme name + file path (no raw
+that section gracefully; in `.tex` themes a `%`-commented placeholder
+(`% {{SUMMARY_SECTION}}`) drops it too — substitution skips LaTeX comments. A malformed
+theme errors with the theme name + file path (no raw
 LaTeX backtrace). `.docx` is generated programmatically and does not use themes.
 
 ---
@@ -463,6 +486,8 @@ version marked `origin=chat_edit`. A plain `reseed` then **refuses** to rebuild 
 it warns and asks for `force:true`, so accumulated chat edits are never silently wiped.
 `doctor` reports this state as "chat-edited (ahead of cv.md) — expected," not a nag. Use
 section edits (`section`+`section_content`) for surgical changes like "change my tagline."
+Renders read the chat-edited packet directly: `render_pdf` overlays its Sections 3–8 onto
+the cv.md base, so a packet edit shows up in the next render without a sync-back.
 
 **File-driven (cv.md / profile.yml are the source).** Edit the files, then `reseed`:
 - Identity, naming, links, **taglines** → `config/profile.yml` (taglines auto-fill Section 2).

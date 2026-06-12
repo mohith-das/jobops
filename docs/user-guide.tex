@@ -246,7 +246,7 @@ The split is the whole point.
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Architecture}
 
-One process. Three planes. Six MCP resources and 51 tools.
+One process. Three planes. Six MCP resources and 51 tools. In HTTP mode that one process serves \emph{many} concurrent MCP clients at once against the one SQLite DB \textemdash{} the shared ``one server, every client'' topology described in the setup chapter.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -437,11 +437,19 @@ All optional. Defaults in parens.
 \end{tabularx}
 \end{center}
 
-\subsection*{Connecting your chat client}
+\subsection*{Connecting your chat client(s): one server, every client}
 
-\cmd{npx job\_ops-mcp connect} prints copy-paste-ready config for the common clients. Below are the two you most likely care about.
+The recommended topology is \textbf{ONE long-running HTTP server = ONE source of truth}. Run \cmd{npx job\_ops-mcp start} once (locally, or on an always-on host over Tailscale) and point \emph{every} interface at the same \texttt{http://127.0.0.1:7891/mcp} endpoint: Claude Code (\cmd{claude mcp add --transport http}), Claude Desktop (via the \texttt{mcp-remote} stdio\textrightarrow{}HTTP bridge, or a paid-plan custom connector), opencode (\fpath{opencode.json}, \texttt{type: remote}), codex (\fpath{\textasciitilde/.codex/config.toml}, \texttt{url} + \texttt{bearer\_token\_env\_var}), gemini-cli (\fpath{settings.json}, \texttt{httpUrl}), LibreChat (\texttt{streamable-http}), and the tracker web UI. Because there is exactly one process and one SQLite DB behind all of them, materials, tracker moves, contacts, and packet edits made in any client are instantly visible in all the others \textemdash{} when one client is rate-limited, switch to another and continue where you left off.
 
-\subsubsection*{Claude Desktop (stdio transport)}
+\cmd{npx job\_ops-mcp connect} prints copy-paste-ready config for each of those clients (flags: \flag{--host}, \flag{--port}, \flag{--token}). Concurrency is safe by design: every HTTP request gets an isolated MCP protocol instance, reads run concurrently (SQLite WAL), and all writes are serialized through one write lock in the single server process \textemdash{} no per-client spawn, no port conflicts, no corruption under multi-client load.
+
+Verify all clients hit the same instance with \cmd{npx job\_ops-mcp status} (flags: \flag{--url}, \flag{--token}): it reports uptime, the source-of-truth DB path + a short fingerprint, and which MCP clients have connected since boot. The \tool{doctor} tool reports the same server-identity block from inside any chat.
+
+\textbf{Auth:} the moment the server is reachable beyond localhost it MUST run with \env{MCP\_JSA\_AUTH\_TOKEN} set (\S\ref{sec:security}) \textemdash{} it serves PII to every connected endpoint and refuses to boot remotely without the token. The token goes into each client's config; \cmd{connect} embeds it automatically when the env var is set.
+
+Below are the two configs you most likely want to paste by hand. The stdio config is the \emph{single-client} alternative: it spawns a private server inside Claude Desktop rather than connecting to the shared one (next to a running shared server it also needs its own \env{MCP\_JSA\_PORT}, or its file server fails with \texttt{EADDRINUSE}).
+
+\subsubsection*{Claude Desktop (stdio transport — single-client alternative)}
 
 Claude Desktop's local MCP only speaks \textbf{stdio}, not HTTP \textemdash{} the
 \flag{--stdio} flag binds MCP to stdin/stdout. The HTTP file server still binds to
@@ -744,7 +752,7 @@ The happy path is left-to-right across the top. \textbf{Green} is the only succe
 
 \begin{description}[leftmargin=0pt]
 \item[\tool{generate\_materials}] Picks bullets / tagline / projects from \fpath{career\_packet.md} per the JD via the tailoring rules. Writes \texttt{applications.tailored\_bullets} + \texttt{cover\_letter\_draft}, validates against the visa rail before persisting. Two-step chat shape; \texttt{api} mode auto-validates LLM output.
-\item[\tool{render\_pdf}] Produces resume + cover in any subset of \texttt{\{pdf, tex, docx\}} via the \texttt{formats} param (default \texttt{["pdf"]}). PDF is HTML\textrightarrow{}Chromium; \texttt{.tex} is a self-contained pdflatex source you can edit and recompile; \texttt{.docx} is generated with the docx library for Word / Google Docs editing. All three share the same tailored content. URLs persist onto the application row's \texttt{rendered\_files} JSON. The visa-leakage rail runs against every output before any file is written. Files land under \fpath{/files/pdfs/}, \fpath{/files/tex/}, \fpath{/files/docx/}.
+\item[\tool{render\_pdf}] Produces resume + cover in any subset of \texttt{\{pdf, tex, docx\}} via the \texttt{formats} param (default \texttt{["pdf"]}). PDF is HTML\textrightarrow{}Chromium; \texttt{.tex} is a self-contained pdflatex source you can edit and recompile; \texttt{.docx} is generated with the docx library for Word / Google Docs editing. All three share one content snapshot taken when the call starts: \fpath{cv.md} + \fpath{profile.yml}, the active career packet (chat edits count \textemdash{} no sync-back needed), and the job's persisted tailored materials at their current \texttt{materials\_v}. URLs persist onto the application row's \texttt{rendered\_files} JSON. The visa-leakage rail runs against every output before any file is written. Files land under \fpath{/files/pdfs/}, \fpath{/files/tex/}, \fpath{/files/docx/}.
 \item[\tool{get\_report}] Returns the localhost URL + metadata for the latest \texttt{eval\_report} of a \texttt{job\_id}.
 \end{description}
 
@@ -1277,7 +1285,7 @@ The loader checks \texttt{\$MCP\_JSA\_TEMPLATE\_DIR} first, so a \fpath{default/
 export MCP_JSA_DEFAULT_TEMPLATE=compact
 \end{lstlisting}
 
-Hard rules still apply regardless of theme: the visa-leakage scan runs on \texttt{cover\_body} \emph{before} substitution, so a custom template cannot inject visa/work-auth language. A theme that omits a placeholder silently drops that section (graceful degradation). A theme missing \verb|\documentclass| or \verb|\begin{document}| produces an error that quotes the theme name + file path \textemdash{} pdflatex's own backtrace never reaches the user.
+Hard rules still apply regardless of theme: the visa-leakage scan runs on \texttt{cover\_body} \emph{before} substitution, so a custom template cannot inject visa/work-auth language. A theme that omits a placeholder silently drops that section (graceful degradation); in \fpath{.tex} themes, commenting a placeholder out (\texttt{\% \{\{SUMMARY\_SECTION\}\}}) drops the section the same way \textemdash{} substitution skips LaTeX comments. A theme missing \verb|\documentclass| or \verb|\begin{document}| produces an error that quotes the theme name + file path \textemdash{} pdflatex's own backtrace never reaches the user.
 
 \fpath{.docx} is generated programmatically and does not use themes. If you need visual variation for \fpath{.docx}, edit the output in Word.
 

@@ -21,6 +21,12 @@ export function getDb(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.pragma('synchronous = NORMAL');
+  // Multi-client topology: all clients of ONE server share this process (writes are
+  // serialized by runInWriteLock below). busy_timeout covers the OTHER case — a second
+  // PROCESS on the same DB file (e.g. a stdio-spawned instance next to the shared HTTP
+  // server): instead of failing instantly with SQLITE_BUSY, a writer waits up to 5s for
+  // the other process's transaction to finish. WAL already lets readers proceed.
+  db.pragma('busy_timeout = 5000');
   ensureMigrationsTable(db);
   applyPendingMigrations(db);
   _db = db;

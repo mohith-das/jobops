@@ -10,10 +10,12 @@ export const doctorTool = defineTool({
   title: 'Server health check (read-only)',
   description:
     'Read-only diagnostics for the running job_ops-mcp server. Returns a structured report: '
-    + 'career_packet ↔ cv.md sync state (incl. chat-edited / cv-edited-after-reseed), LLM '
-    + 'provider + key, MCP sampling posture, auth posture, active resume template, modes '
-    + '(bundled vs project-root overrides), visa scoring, public base URL, Chromium, Node, and '
-    + 'config files. Mutates nothing — safe to call anytime to see how the server is wired.',
+    + 'server identity (pid, uptime, transport, DB path + fingerprint, MCP clients seen — '
+    + 'verifies all your clients share this one instance + DB), career_packet ↔ cv.md sync '
+    + 'state (incl. chat-edited / cv-edited-after-reseed), LLM provider + key, MCP sampling '
+    + 'posture, auth posture, active resume template, modes (bundled vs project-root '
+    + 'overrides), visa scoring, public base URL, Chromium, Node, and config files. Mutates '
+    + 'nothing — safe to call anytime to see how the server is wired.',
   inputSchema: {},
   handler: async (_args, ctx) => {
     // Report the LIVE sampling state negotiated with THIS connected client, not a guess.

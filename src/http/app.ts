@@ -11,6 +11,7 @@ import { resolve, normalize, relative, sep } from 'node:path';
 
 import { config } from '../config.js';
 import { renderDashboard, renderTrashPage, countsJson } from './dashboard.js';
+import { serverStatus } from '../core/server_status.js';
 import { bearerAuthMiddleware, protectedResourceMetadata } from '../core/auth.js';
 import { mountElicit } from './elicit.js';
 import {
@@ -71,6 +72,11 @@ export function buildHttpApp(): Express {
   // ── Tracker CRUD API — the UI calls these; they share core/job_trash.ts with the MCP
   // tools (one implementation). All are behind the same auth guard as the dashboard. ──
   app.get('/api/counts', (_req: Request, res: Response) => res.json(countsJson()));
+
+  // Server identity for the shared-topology check: uptime, DB path + fingerprint,
+  // clients seen since boot. Auth-gated (mounted after the guard) — the DB path and
+  // client list are operator-only detail. The CLI `status` command reads this.
+  app.get('/api/status', (_req: Request, res: Response) => res.json(serverStatus()));
 
   app.post('/api/jobs/:id/status', async (req: Request, res: Response) => {
     const status = String(req.body?.status ?? '');

@@ -121,3 +121,19 @@ test('protected-resource metadata is discoverable unauthenticated', async () => 
   const meta = await r.json();
   assert.ok(String(meta.resource).endsWith('/mcp'));
 });
+
+// Shared-topology surface: the server-identity endpoint carries the DB path and the
+// client list — operator-only detail, same gate as the rest of the PII surface.
+test('/api/status WITHOUT a token → 401 (server identity is operator-only)', async () => {
+  const r = await fetch(`${baseUrl}/api/status`);
+  assert.equal(r.status, 401);
+});
+
+test('/api/status WITH the token → full server identity JSON', async () => {
+  const r = await fetch(`${baseUrl}/api/status`, { headers: { authorization: `Bearer ${TOKEN}` } });
+  assert.equal(r.status, 200);
+  const s = await r.json();
+  assert.ok(typeof s.db_path === 'string' && s.db_path.length > 0);
+  assert.match(s.db_fingerprint, /^[0-9a-f]{12}$/);
+  assert.ok(Array.isArray(s.clients_seen));
+});

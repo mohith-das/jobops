@@ -314,7 +314,61 @@ A working starter is at `.env.example`.
 
 ---
 
+## Run one server, use every client
+
+The recommended multi-client topology: **ONE long-running HTTP server = ONE source of
+truth.** Start it once, point every interface at it:
+
+```bash
+npx job_ops-mcp start          # HTTP mode — serves MANY concurrent MCP clients
+npx job_ops-mcp connect        # prints ready-to-paste config for each client below
+```
+
+All clients connect to the same `http://127.0.0.1:7891/mcp` (or a Tailscale host:port —
+see [Running on a remote host](#running-on-a-remote-host--tailscale)). Materials,
+tracker moves, contacts, packet edits made in **any** client are instantly visible in
+**all** the others, because there is exactly one process and one SQLite DB behind them.
+Rate-limited in one client? Switch to another — nothing is lost.
+
+| Client | Config (all printed by `connect`) |
+|---|---|
+| **Claude Code** | `claude mcp add --transport http job_ops-mcp <url>` or `.mcp.json` (`"type": "http"`) |
+| **Claude Desktop** | `mcp-remote` bridge in `claude_desktop_config.json` (stdio→HTTP), or a paid-plan custom connector |
+| **opencode** | `opencode.json` → `"mcp": { … "type": "remote", "url": … }` |
+| **codex** | `~/.codex/config.toml` → `[mcp_servers.job_ops_mcp]` with `url` + `bearer_token_env_var` |
+| **gemini-cli** | `~/.gemini/settings.json` → `"httpUrl"` + `"headers"` |
+| **LibreChat** | `librechat.yaml` → `type: streamable-http` (see below for Docker) |
+| **Web UI / browser** | the tracker dashboard at `/` is the same server, same DB |
+
+Concurrency is safe by design: each HTTP request gets an isolated MCP protocol
+instance, reads run concurrently (SQLite WAL), and **all writes are serialized through
+one write lock** in the single server process — no corruption under multi-client load,
+no per-client spawn, no port conflicts.
+
+Verify everything is wired to the same instance:
+
+```bash
+npx job_ops-mcp status         # uptime, source-of-truth DB path + fingerprint,
+                               # clients seen since boot (add --url / --token as needed)
+```
+
+The `doctor` tool reports the same server-identity block from inside any chat client.
+
+**Auth:** the moment the server is reachable beyond localhost (Tailscale / LAN /
+always-on box), you **must** set `MCP_JSA_AUTH_TOKEN` — it serves PII (resume, contacts,
+H1B data) to every connected endpoint, and it refuses to boot remotely without the
+token (see [Security model](#security-model)). The token then goes into each client's
+config; `connect` embeds it automatically when the env var is set.
+
+---
+
 ## Wiring it to Claude Desktop (stdio transport)
+
+**Single-client alternative.** This spawns a *private* server inside Claude Desktop
+rather than connecting to the shared one — fine when Claude Desktop is your only
+client. For the shared topology above, use the `mcp-remote` bridge that `connect`
+prints instead. (A stdio instance next to a running shared server also needs its own
+`MCP_JSA_PORT`, or the HTTP file server inside it fails with `EADDRINUSE`.)
 
 Claude Desktop's local MCP only speaks **stdio**, not HTTP. Use the `--stdio` flag:
 
@@ -528,9 +582,13 @@ All URLs persist onto the application row in the `rendered_files` JSON column so
 `get_tracker`, `apply_prefill`, and `daily_digest` can find them later. Re-rendering
 one format merges into the existing map — never clobbers the others.
 
-The `.tex` and `.docx` are built from the same parsed `cv.md` and `cover_body` the
-PDF uses, so editing and recompiling the `.tex` reproduces the same document. The
-visa-leakage rail runs against every output format before files are written.
+All formats in one call share a single content snapshot taken when the call starts:
+`cv.md` + `profile.yml`, the active career packet (chat edits count — no sync-back
+needed), and the job's persisted tailored materials (`generate_materials` output,
+current `materials_v`). So editing and recompiling the `.tex` reproduces the same
+document, and re-rendering after a packet edit or a new materials version produces
+the updated one. The visa-leakage rail runs against every output format before
+files are written.
 
 ### Custom themes
 
@@ -566,7 +624,9 @@ to make a non-`default` theme the implicit default for every call.
 | `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` arg. |
 
 A custom theme that omits a placeholder degrades gracefully (the section is dropped,
-the renderer does not crash). A malformed theme (missing `\documentclass`, missing
+the renderer does not crash). In `.tex` themes, commenting a placeholder out
+(`% {{SUMMARY_SECTION}}`) drops the section the same way — substitution skips
+LaTeX comments. A malformed theme (missing `\documentclass`, missing
 `\begin{document}`, etc.) returns a clear error naming the theme + file — pdflatex's
 own backtrace never reaches the user. The visa-leakage scan and ATS hard rules apply
 regardless of which theme you pick.

@@ -4,7 +4,9 @@
 //             run migrations, prompt for project root. Idempotent (never overwrites).
 //   start   — boot MCP + HTTP server. Auto-installs Chromium on first run.
 //   doctor  — diagnose Node version, Chromium presence, config files, LLM key.
-//   connect — print copy-paste config for Claude Desktop + generic MCP clients.
+//   connect — print copy-paste config for every MCP client (Claude Desktop, Claude Code,
+//             opencode, codex, gemini-cli, LibreChat) against ONE shared HTTP server.
+//   status  — query a running server: uptime, source-of-truth DB, clients seen.
 
 import { existsSync, copyFileSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -211,53 +213,107 @@ async function cmdDoctor() {
 // ── connect ─────────────────────────────────────────────────────────────────
 
 async function cmdConnect(flags: Map<string, string | boolean>) {
-  // When MCP_JSA_PUBLIC_BASE_URL is set (remote host / Tailscale), use it for the
-  // generic + LibreChat-host config blocks so the URL the user pastes actually
-  // reaches the server from another device. Falls back to host:port for local use.
+  // When MCP_JSA_PUBLIC_BASE_URL is set (remote host / Tailscale), use it for every
+  // config block so the URL the user pastes actually reaches the server from other
+  // devices. Falls back to host:port for local use.
   const port = String(flags.get('port') ?? process.env.MCP_JSA_PORT ?? '7891');
   const host = String(flags.get('host') ?? process.env.MCP_JSA_HOST ?? '127.0.0.1');
   const { config: cfg } = await import('./config.js');
   const url = cfg.publicBaseUrlIsExplicit ? `${cfg.publicBaseUrl}/mcp` : `http://${host}:${port}/mcp`;
+  const token = (typeof flags.get('token') === 'string' ? String(flags.get('token')) : cfg.authToken) || null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const isLocal = !cfg.publicBaseUrlIsExplicit && ['127.0.0.1', 'localhost', '::1'].includes(host);
   // Host-resolvable from inside a Docker container (LibreChat default deploy shape).
   // host.docker.internal works out-of-the-box on Docker Desktop (macOS/Windows) and on
   // Linux when the compose file sets `extra_hosts: ["host.docker.internal:host-gateway"]`.
   const dockerHost = 'host.docker.internal';
   const dockerUrl  = `http://${dockerHost}:${port}/mcp`;
 
-  console.log(c.bold(`\njob_ops-mcp connect\n`));
-  console.log(`Server endpoint: ${c.bold(url)}\n`);
+  console.log(c.bold(`\njob_ops-mcp connect — one server, every client\n`));
+  console.log(`Recommended topology: ${c.bold('ONE long-running server = ONE source of truth.')}`);
+  console.log(`  Start it once:           ${c.bold('npx job_ops-mcp start')}   ${c.dim('(HTTP mode — serves many concurrent clients)')}`);
+  console.log(`  Every client connects to: ${c.bold(url)}`);
+  console.log(c.dim(
+    '  Work done in ANY client (materials, tracker, contacts, packet edits) is instantly\n' +
+    '  visible in ALL others — switch clients freely (e.g. when one is rate-limited)\n' +
+    '  without losing state. Run it locally, or on an always-on host over Tailscale.\n'));
 
-  console.log(c.bold('Generic MCP client (streamable-HTTP, stateless):'));
+  if (token) {
+    console.log(`Auth: ${c.bold('MCP_JSA_AUTH_TOKEN is set')} — the configs below include the bearer token.`);
+  } else if (isLocal) {
+    console.log(`Auth: localhost, no token — fine for same-machine clients.`);
+    console.log(c.dim(
+      '  Sharing the server beyond localhost (Tailscale / LAN / always-on host)? You MUST set\n' +
+      '  MCP_JSA_AUTH_TOKEN — the server refuses to boot on a non-localhost bind without it,\n' +
+      '  because it serves PII (resume, contacts, H1B data) to every connected endpoint.\n' +
+      '  Generate one:  export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"\n' +
+      '  then re-run `connect` — every config below will include it.'));
+  } else {
+    console.log(c.yellow(
+      'Auth: non-localhost endpoint with NO token in this shell — the server will not boot\n' +
+      'like this. Set MCP_JSA_AUTH_TOKEN (export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)")\n' +
+      'and re-run `connect` so the configs include it.'));
+  }
+
+  // ── Claude Code ────────────────────────────────────────────────────────────
+  console.log(c.bold('\n── Claude Code ──'));
+  const ccHeader = token ? ` --header "Authorization: Bearer ${token}"` : '';
+  console.log(`One command:\n  ${c.bold(`claude mcp add --transport http job_ops-mcp ${url}${ccHeader}`)}`);
+  console.log(c.dim('Or per-project .mcp.json (commit-able; --scope project writes this):'));
   console.log(JSON.stringify({
-    name:      'job_ops-mcp',
-    transport: 'streamable-http',
-    url,
+    mcpServers: { 'job_ops-mcp': { type: 'http', url, ...(authHeaders ? { headers: authHeaders } : {}) } },
   }, null, 2));
 
-  console.log(c.bold('\nClaude Desktop — claude_desktop_config.json (stdio transport):'));
+  // ── Claude Desktop (shared server) ─────────────────────────────────────────
+  console.log(c.bold('\n── Claude Desktop — connect to the SHARED server (mcp-remote bridge) ──'));
   console.log(c.dim('macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json'));
-  console.log(c.dim('Windows: %APPDATA%/Claude/claude_desktop_config.json\n'));
-  console.log(c.dim('Claude Desktop only speaks MCP over stdio. The --stdio flag binds MCP to'));
-  console.log(c.dim('stdin/stdout; the HTTP file server still runs on the port so /files/* links work.\n'));
+  console.log(c.dim('Windows: %APPDATA%/Claude/claude_desktop_config.json'));
+  console.log(c.dim(
+    'Claude Desktop config files only launch stdio servers, so bridge stdio→HTTP with\n' +
+    'mcp-remote — Desktop talks stdio to the bridge; the bridge talks to the ONE shared server.\n' +
+    '(Alternative on paid plans: Settings → Connectors → "Add custom connector" with the URL.)\n'));
   console.log(JSON.stringify({
     mcpServers: {
       'job_ops-mcp': {
         command: 'npx',
-        args:    ['-y', PKG.name, 'start', '--stdio'],
-        env: {
-          MCP_JSA_PORT: port,
-          MCP_JSA_HOST: host,
-          MCP_JSA_PROJECT_ROOT: process.cwd(),
-        },
+        args: ['-y', 'mcp-remote', url, ...(token ? ['--header', `Authorization: Bearer ${token}`] : [])],
       },
     },
   }, null, 2));
 
-  // ── LibreChat ────────────────────────────────────────────────────────────
+  // ── opencode ───────────────────────────────────────────────────────────────
+  console.log(c.bold('\n── opencode — opencode.json ──'));
+  console.log(JSON.stringify({
+    $schema: 'https://opencode.ai/config.json',
+    mcp: {
+      'job_ops-mcp': { type: 'remote', url, enabled: true, ...(authHeaders ? { headers: authHeaders } : {}) },
+    },
+  }, null, 2));
+
+  // ── codex ──────────────────────────────────────────────────────────────────
+  console.log(c.bold('\n── codex — ~/.codex/config.toml ──'));
+  console.log(c.dim(token
+    ? 'codex reads the bearer token from an env var (bearer_token_env_var) — keep MCP_JSA_AUTH_TOKEN exported in the shell that launches codex.'
+    : 'No token set — add bearer_token_env_var = "MCP_JSA_AUTH_TOKEN" when you enable auth.'));
+  console.log([
+    `[mcp_servers.job_ops_mcp]`,
+    `url = "${url}"`,
+    ...(token ? [`bearer_token_env_var = "MCP_JSA_AUTH_TOKEN"`] : []),
+  ].join('\n'));
+  console.log(c.dim('Older codex builds without streamable-HTTP support can bridge instead:\n' +
+    `  [mcp_servers.job_ops_mcp]\n  command = "npx"\n  args = ["-y", "mcp-remote", "${url}"${token ? `, "--header", "Authorization: Bearer ${token}"` : ''}]`));
+
+  // ── gemini-cli ─────────────────────────────────────────────────────────────
+  console.log(c.bold('\n── gemini-cli — ~/.gemini/settings.json (or .gemini/settings.json per project) ──'));
+  console.log(JSON.stringify({
+    mcpServers: { 'job_ops-mcp': { httpUrl: url, ...(authHeaders ? { headers: authHeaders } : {}) } },
+  }, null, 2));
+
+  // ── LibreChat ──────────────────────────────────────────────────────────────
   // LibreChat's MCP transport for HTTP endpoints is `type: streamable-http`
   // (NOT `sse` — that's a separate legacy transport). Add to `librechat.yaml`
   // under `mcpServers:`. Docs: librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers
-  console.log(c.bold('\nLibreChat — librechat.yaml (host-process deploy):'));
+  console.log(c.bold('\n── LibreChat — librechat.yaml (host-process deploy) ──'));
   console.log(c.dim('Add under top-level `mcpServers:` in your librechat.yaml, then restart LibreChat.\n'));
   console.log(yamlBlock({
     mcpServers: {
@@ -265,11 +321,12 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
         type:    'streamable-http',
         url,
         timeout: 60000,
+        ...(authHeaders ? { headers: authHeaders } : {}),
       },
     },
   }));
 
-  console.log(c.bold('\nLibreChat in Docker — librechat.yaml + SSRF allowlist:'));
+  console.log(c.bold('\n── LibreChat in Docker — librechat.yaml + SSRF allowlist ──'));
   console.log(c.dim(
     'Inside a container, 127.0.0.1 points at the CONTAINER, not your host. Swap to ' +
     'host.docker.internal (Docker Desktop) or a LAN IP (Linux + extra_hosts).\n' +
@@ -282,6 +339,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
         type:    'streamable-http',
         url:     dockerUrl,
         timeout: 60000,
+        ...(authHeaders ? { headers: authHeaders } : {}),
       },
     },
     mcpSettings: {
@@ -296,7 +354,103 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     "host's LAN IP and allowlist that IP:port instead.",
   ));
 
+  // ── Generic ────────────────────────────────────────────────────────────────
+  console.log(c.bold('\n── Any other MCP client (streamable-HTTP, stateless) ──'));
+  console.log(JSON.stringify({
+    name:      'job_ops-mcp',
+    transport: 'streamable-http',
+    url,
+    ...(authHeaders ? { headers: authHeaders } : {}),
+  }, null, 2));
+
+  // ── stdio (single-client alternative) ──────────────────────────────────────
+  console.log(c.bold('\n── stdio mode — single-client alternative (NOT shared) ──'));
+  console.log(c.dim(
+    'This launches a PRIVATE server inside the client instead of connecting to the shared\n' +
+    'one. Tradeoffs: (a) state is only shared with other clients if they point at the same\n' +
+    'project root / DB file — and even then they are separate processes; (b) a shared HTTP\n' +
+    'server already running on the same port causes EADDRINUSE — give a stdio instance its\n' +
+    'own MCP_JSA_PORT. Prefer the mcp-remote bridge above for shared mode. Claude Desktop\n' +
+    'stdio config (claude_desktop_config.json):\n'));
+  console.log(JSON.stringify({
+    mcpServers: {
+      'job_ops-mcp': {
+        command: 'npx',
+        args:    ['-y', PKG.name, 'start', '--stdio'],
+        env: {
+          MCP_JSA_PORT: port,
+          MCP_JSA_HOST: host,
+          MCP_JSA_PROJECT_ROOT: process.cwd(),
+        },
+      },
+    },
+  }, null, 2));
+
+  console.log(c.dim(`\nVerify any client is hitting the shared instance:  npx job_ops-mcp status${token ? ' --token <token>' : ''}\n`));
+}
+
+// ── status ──────────────────────────────────────────────────────────────────
+// Queries a RUNNING server over HTTP — answers "is it up, which DB is the source of
+// truth, and which clients have connected?" so a multi-client setup can be verified.
+
+async function cmdStatus(flags: Map<string, string | boolean>) {
+  const { config: cfg } = await import('./config.js');
+  const flagUrl = flags.get('url');
+  const base = (typeof flagUrl === 'string' ? flagUrl : (cfg.publicBaseUrlIsExplicit ? cfg.publicBaseUrl : cfg.listenUrl)).replace(/\/+$/, '');
+  const flagToken = flags.get('token');
+  const token = (typeof flagToken === 'string' ? flagToken : cfg.authToken) || null;
+
+  console.log(c.bold(`\njob_ops-mcp status — ${base}\n`));
+
+  let health: any;
+  try {
+    const r = await fetch(`${base}/healthz`);
+    health = await r.json();
+  } catch (e: any) {
+    console.log(`${cross()} No server reachable at ${base} (${e?.cause?.code ?? e?.message ?? e})`);
+    console.log(c.dim('   Start the shared server with:  npx job_ops-mcp start'));
+    console.log(c.dim('   Or point this check elsewhere: npx job_ops-mcp status --url http://host:7891\n'));
+    process.exit(1);
+  }
+  console.log(`${tick()} Server reachable (auth: ${health.auth})`);
+
+  const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+  const r = await fetch(`${base}/api/status`, { headers });
+  if (r.status === 401) {
+    console.log(`${cross()} /api/status requires the bearer token (server runs with auth enabled).`);
+    console.log(c.dim('   Pass it:  npx job_ops-mcp status --token <token>   (or export MCP_JSA_AUTH_TOKEN)\n'));
+    process.exit(1);
+  }
+  if (!r.ok) {
+    console.log(`${cross()} /api/status returned HTTP ${r.status} — is this an older job_ops-mcp (< 0.13)?\n`);
+    process.exit(1);
+  }
+  const s = await r.json();
+
+  console.log(`${tick()} ${s.package}@${s.version} — pid ${s.pid}, up ${formatUptimeCli(s.uptime_s)}, transport: ${s.transport_mode}`);
+  console.log(`${tick()} Source of truth DB: ${c.bold(s.db_path)}  ${c.dim(`[fingerprint ${s.db_fingerprint}]`)}`);
+  console.log(c.dim('   Every client connected to this URL reads + writes THIS database — work done in'));
+  console.log(c.dim('   one client appears in all. Same fingerprint on two checks = same source of truth.'));
+  console.log(`${tick()} Project root: ${s.project_root}`);
+  console.log(`${tick()} MCP requests handled since boot: ${s.mcp_requests_total}`);
+  if (Array.isArray(s.clients_seen) && s.clients_seen.length) {
+    console.log(`${tick()} Clients seen since boot (${s.clients_seen.length}):`);
+    for (const cl of s.clients_seen) {
+      console.log(`     · ${cl.name}@${cl.version}  ${c.dim(`from ${cl.remote} — last seen ${cl.last_seen}, ${cl.initializes} initialize(s)`)}`);
+    }
+  } else {
+    console.log(`${warn()} No MCP clients have connected since boot.`);
+  }
   console.log('');
+}
+
+function formatUptimeCli(s: number): string {
+  if (s < 90) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 90) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
 // ── tiny YAML serializer (object → block-style YAML, two-space indent) ──────
@@ -431,7 +585,12 @@ COMMANDS
                     config/profile.yml. Run this after editing cv.md.
   templates         List available resume/cover themes (bundled + user dir).
   doctor            Diagnose Node version, Chromium, config files, LLM key.
-  connect           Print copy-paste MCP client config (Claude Desktop + LibreChat).
+  connect           Print copy-paste config for EVERY client (Claude Desktop, Claude
+                    Code, opencode, codex, gemini-cli, LibreChat) pointing at the ONE
+                    shared HTTP server. Flags: --host --port --token.
+  status            Check a RUNNING server: uptime, source-of-truth DB + fingerprint,
+                    clients seen. Flags: --url --token. Verifies all clients share
+                    one instance.
   help              Show this message.
 
 ENV
@@ -461,6 +620,7 @@ async function main() {
       case 'start':   await cmdStart(flags);   break;
       case 'doctor':  await cmdDoctor();       break;
       case 'connect': await cmdConnect(flags); break;
+      case 'status':  await cmdStatus(flags);  break;
       case 'reseed':    await cmdReseed(flags);   break;
       case 'templates': await cmdTemplates();     break;
       case '--version': case '-v': case 'version': console.log(PKG.version); break;

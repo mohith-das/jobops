@@ -34,6 +34,15 @@ export interface DoctorReport {
   summary:  string;
 }
 
+function formatUptime(s: number): string {
+  if (s < 90) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 90) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
 function pkgInfo(): { name: string; version: string } {
   try {
     const p = JSON.parse(readFileSync(resolve(config.installDir, 'package.json'), 'utf-8'));
@@ -208,6 +217,31 @@ export async function runDoctorChecks(
   // the socket is already bound here (this replaces any "is the port free?" cold-start check).
   add({ id: 'listen', label: ctx === 'server' ? 'Listening on' : 'Bind target', status: 'info',
         detail: ctx === 'server' ? `${config.listenUrl} (server bound)` : config.listenUrl });
+
+  // 11b. Server identity — the shared-topology check ("are all my clients hitting the same
+  // instance + the same DB?"). In server context this is THE source of truth; cold context
+  // reports the DB this process WOULD use.
+  try {
+    const { serverStatus } = await import('./server_status.js');
+    const s = serverStatus();
+    if (ctx === 'server') {
+      const clientList = s.clients_seen.length
+        ? s.clients_seen.map(c => `${c.name}@${c.version} (${c.remote})`).join('; ')
+        : 'none yet';
+      add({
+        id: 'server_identity', label: 'Server', status: 'info',
+        detail: `pid ${s.pid}, up ${formatUptime(s.uptime_s)}, transport ${s.transport_mode}, `
+              + `${s.mcp_requests_total} MCP request(s) — DB ${s.db_path} [${s.db_fingerprint}] is the single source of truth. `
+              + `Clients seen since boot: ${clientList}. `
+              + `(Every client connected to this URL shares this DB — work done in one appears in all.)`,
+      });
+    } else {
+      add({ id: 'server_identity', label: 'Database', status: 'info',
+            detail: `${s.db_path} [${s.db_fingerprint}] — clients pointed at the same running server share this DB.` });
+    }
+  } catch (e: any) {
+    add({ id: 'server_identity', label: 'Server', status: 'warn', detail: `status check failed: ${e?.message ?? e}` });
+  }
 
   // 12. Career-packet ↔ cv.md sync state.
   try {

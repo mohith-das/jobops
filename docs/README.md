@@ -1,6 +1,6 @@
 # docs/
 
-Long-form documentation for `job_ops-mcp`.
+Long-form documentation for `jobops`.
 
 ## Files
 

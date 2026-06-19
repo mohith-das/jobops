@@ -1,17 +1,17 @@
 {
-  "name": "job_ops-mcp",
-  "version": "0.13.1",
+  "name": "jobops",
+  "version": "0.14.0",
   "description": "Self-hosted MCP server for the full job-search loop: portal scanning, JD evaluation, tailored resume + cover PDFs, outreach drafting, story bank, negotiation brief — chat-driven, human-in-the-loop.",
   "type": "module",
   "private": false,
   "license": "MIT",
-  "homepage": "https://github.com/mohith-das/job_ops-mcp#readme",
+  "homepage": "https://github.com/mohith-das/jobops#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mohith-das/job_ops-mcp.git"
+    "url": "git+https://github.com/mohith-das/jobops.git"
   },
   "bugs": {
-    "url": "https://github.com/mohith-das/job_ops-mcp/issues"
+    "url": "https://github.com/mohith-das/jobops/issues"
   },
   "keywords": [
     "mcp",
@@ -26,8 +26,7 @@
     "playwright"
   ],
   "bin": {
-    "job_ops-mcp": "dist/cli.js",
-    "job-ops-mcp": "dist/cli.js"
+    "jobops": "dist/cli.js"
   },
   "files": [
     "dist/",

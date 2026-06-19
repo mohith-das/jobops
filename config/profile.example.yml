@@ -1,6 +1,6 @@
-# job_ops-mcp profile configuration.
+# jobops profile configuration.
 #
-# Copy to `config/profile.yml` (or let `npx job_ops-mcp init` do it) and fill in your
+# Copy to `config/profile.yml` (or let `npx jobops init` do it) and fill in your
 # details. This is the source of truth for your identity + targeting + comp/location
 # preferences. The chat reads it via the rubric + career_packet resources.
 
@@ -27,7 +27,7 @@ target_roles:
     - { name: "<archetype label, e.g. Forward-Deployed>",level: "Mid-Senior", fit: "adjacent"  }
 
 # Per-archetype taglines. Optional but recommended.
-# On `reseed` (CLI `npx job_ops-mcp reseed` or the reseed_career_packet tool) these
+# On `reseed` (CLI `npx jobops reseed` or the reseed_career_packet tool) these
 # auto-populate Section 2 (tagline alternatives) of the career packet — one bullet per
 # archetype — so you never have to re-stamp them by hand. The job rater picks ONE per
 # JD based on the detected role_category. Key = archetype label (match your

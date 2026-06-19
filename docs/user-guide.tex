@@ -1,4 +1,4 @@
-% job_ops-mcp — End-to-end user guide.
+% jobops — End-to-end user guide.
 % Compile with: pdflatex user-guide.tex && pdflatex user-guide.tex
 % Toolchain: pdflatex (TeX Live), no shell-escape, no minted, no fontawesome.
 % Fonts: Charter (serif body) + Helvetica clone (sans headings) — both in any basic TL.
@@ -85,14 +85,14 @@
 \fancyhf{}
 \renewcommand{\headrulewidth}{0.3pt}
 \renewcommand{\headrule}{\hbox to\headwidth{\color{rulec}\leaders\hrule height \headrulewidth\hfill}}
-\fancyhead[L]{\small\sffamily\color{accent!85!black} job\_ops-mcp \textemdash{} user guide}
+\fancyhead[L]{\small\sffamily\color{accent!85!black} jobops \textemdash{} user guide}
 \fancyhead[R]{\small\sffamily\color{accent!85!black} \rightmark}
 \fancyfoot[C]{\small\sffamily\color{black!60}\thepage}
 \renewcommand{\sectionmark}[1]{\markright{\thesection\ \ #1}}
 
 \PassOptionsToPackage{hyphens}{url}
 \usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,citecolor=accent,bookmarks=true,bookmarksnumbered=true,breaklinks=true]{hyperref}
-% PDF metadata set post-load so the underscore in "job_ops-mcp" survives.
+% PDF metadata set post-load so the underscore in "jobops" survives.
 \hypersetup{
   pdftitle={job\string_ops-mcp user guide},
   pdfauthor={job\string_ops-mcp},
@@ -114,7 +114,7 @@
 \tolerance=2000
 
 % ── Macros ──────────────────────────────────────────────────────────────────
-\newcommand{\pkg}{\texttt{job\_ops-mcp}}
+\newcommand{\pkg}{\texttt{jobops}}
 \newcommand{\tool}[1]{\texttt{#1}}
 \newcommand{\flag}[1]{\texttt{#1}}
 \newcommand{\fpath}[1]{\texttt{#1}}
@@ -177,7 +177,7 @@
 \centering
 \vspace*{2cm}
 \begin{tikzpicture}
-  \node[font=\Huge\sffamily\bfseries\color{accent}] (t) at (0,0) {job\_ops-mcp};
+  \node[font=\Huge\sffamily\bfseries\color{accent}] (t) at (0,0) {jobops};
   \draw[accent, line width=1.2pt] ($(t.south west)+(0,-0.15)$) -- ($(t.south east)+(0,-0.15)$);
 \end{tikzpicture}
 \vspace{0.8em}
@@ -203,7 +203,7 @@ The chat reasons. The server executes. Every artifact comes back as a localhost 
 
 \begin{tabular}{rl}
 \textsf{\small\bfseries Version} & \texttt{0.12.0} \\
-\textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/job_ops-mcp} \\
+\textsf{\small\bfseries Repo}    & \url{https://github.com/mohith-das/jobops} \\
 \textsf{\small\bfseries License} & MIT \\
 \end{tabular}
 
@@ -275,7 +275,7 @@ One process. Three planes. Six MCP resources and 51 tools. In HTTP mode that one
 \node[proc] (produce)  at (9.3, 3.3) {\bfseries Produce\\\scriptsize generate\_materials\\\scriptsize render\_pdf, draft\_outreach};
 
 % Storage layer
-\node[store] (sqlite) at (2.2, 1.0) {SQLite\\\scriptsize\texttt{data/mcp-jsa.db}\\\scriptsize WAL mode};
+\node[store] (sqlite) at (2.2, 1.0) {SQLite\\\scriptsize\texttt{data/jobops.db}\\\scriptsize WAL mode};
 \node[proc, fill=accent!8, minimum width=3.0cm] (express) at (5.5, 1.0) {Express HTTP\\\scriptsize\texttt{/files/*}\\\scriptsize tracker dashboard};
 \node[proc, fill=accent!8, minimum width=3.0cm] (modes)   at (9.0, 1.0) {modes/ + templates/\\\scriptsize MCP resources\\\scriptsize HTML + LaTeX};
 
@@ -320,7 +320,7 @@ One process. Three planes. Six MCP resources and 51 tools. In HTTP mode that one
 No external Postgres. No n8n. No cloud anything. The single-process design means:
 
 \begin{itemize}
-\item \textbf{Boot in 2 seconds.} \cmd{npx job\_ops-mcp start} \textemdash{} no docker compose, no migrations to run by hand, no init container.
+\item \textbf{Boot in 2 seconds.} \cmd{npx jobops start} \textemdash{} no docker compose, no migrations to run by hand, no init container.
 \item \textbf{Local data, local artifacts.} Your jobs, your scores, your LinkedIn export, your H1B import, your tailored PDFs all live next to your \fpath{cv.md} in one directory. Back it up by copying that directory.
 \item \textbf{Chat-driven, not autonomous.} The server reacts to chat tool calls. It is not a background daemon scraping the web.
 \item \textbf{Opt-in cron.} If you do want background scans, \tool{scheduler\_enable} turns on a per-job interval. Off by default.
@@ -342,23 +342,23 @@ No external Postgres. No n8n. No cloud anything. The single-process design means
 \begin{lstlisting}[language=bashplus]
 # 1. Scaffold cv.md, config/profile.yml, portals.yml in the current directory
 #    and create the SQLite database. Idempotent --- safe to re-run.
-npx job_ops-mcp init
+npx jobops init
 
 # 2. Edit the three files. Replace every <TODO> placeholder.
 
 # 3. Rebuild the career_packet from your now-real cv.md. (Or just re-run
 #    `init` --- it auto-reseeds when it detects cv.md changed.)
-npx job_ops-mcp reseed
+npx jobops reseed
 
 # 4. Confirm everything is wired.
-npx job_ops-mcp doctor
+npx jobops doctor
 
 # 5. Boot the server. Chromium auto-installs on first run (~150 MB, one-time).
-npx job_ops-mcp start
+npx jobops start
 \end{lstlisting}
 
 \begin{tipbox}
-The CLI is also published as the dual alias \cmd{npx job-ops-mcp} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
+The CLI is also published as the dual alias \cmd{npx jobops} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
 \end{tipbox}
 
 \begin{tipbox}[Editing the packet — two safe directions]
@@ -385,7 +385,7 @@ Section 9, which reseed always preserves. A self-contained operator reference sh
 
 \subsection*{What \tool{init} creates}
 
-After \cmd{npx job\_ops-mcp init} from a clean directory you'll have:
+After \cmd{npx jobops init} from a clean directory you'll have:
 
 \begin{lstlisting}
 my-job-search/
@@ -394,7 +394,7 @@ my-job-search/
 |   `-- profile.yml        <- copy of config/profile.example.yml
 |-- portals.yml            <- copy of portals.example.yml
 `-- data/
-    `-- mcp-jsa.db         <- SQLite with both migrations applied
+    `-- jobops.db         <- SQLite with both migrations applied
 \end{lstlisting}
 
 The three editable files are the ``user layer.'' The server reads them at runtime; you own their content.
@@ -421,41 +421,41 @@ All optional. Defaults in parens.
 \toprule
 \rowcolor{accent!10}\textbf{Variable} & \textbf{Purpose} \\
 \midrule
-\env{MCP\_JSA\_PORT}              & HTTP port. \textit{(7891)} \\
-\env{MCP\_JSA\_HOST}              & Bind host. \textit{(127.0.0.1)} \\
-\env{MCP\_JSA\_PROJECT\_ROOT}     & Where \fpath{cv.md} / \fpath{profile.yml} / \fpath{portals.yml} live. \textit{(current directory)} \\
-\env{MCP\_JSA\_DATA\_DIR}         & SQLite location. \textit{(\texttt{<project\_root>/data})} \\
-\env{MCP\_JSA\_OUTPUT\_DIR}       & Where generated PDFs and report HTML land. \textit{(\texttt{<project\_root>/output})} \\
-\env{MCP\_JSA\_VISA\_SCORING}     & Set to \texttt{false} to drop the visa surface entirely (see \S\ref{sec:custom}). \textit{(true)} \\
-\env{MCP\_JSA\_PUBLIC\_BASE\_URL} & Public URL emitted in artifact links. Set when running on a remote host (Tailscale / LAN / cloud) so links are reachable from your chat machine. See \S\ref{sec:remote-host}. \textit{(default: \texttt{http://127.0.0.1:<port>})} \\
-\env{MCP\_JSA\_LLM\_PROVIDER}     & \texttt{gemini} \textbar{} \texttt{deepseek} \textbar{} \texttt{none}. \textit{(gemini)} \\
-\env{MCP\_JSA\_LLM\_MODEL}        & Provider-specific model id. \textit{(empty \textrightarrow{} provider default)} \\
+\env{JOBOPS\_PORT}              & HTTP port. \textit{(7891)} \\
+\env{JOBOPS\_HOST}              & Bind host. \textit{(127.0.0.1)} \\
+\env{JOBOPS\_PROJECT\_ROOT}     & Where \fpath{cv.md} / \fpath{profile.yml} / \fpath{portals.yml} live. \textit{(current directory)} \\
+\env{JOBOPS\_DATA\_DIR}         & SQLite location. \textit{(\texttt{<project\_root>/data})} \\
+\env{JOBOPS\_OUTPUT\_DIR}       & Where generated PDFs and report HTML land. \textit{(\texttt{<project\_root>/output})} \\
+\env{JOBOPS\_VISA\_SCORING}     & Set to \texttt{false} to drop the visa surface entirely (see \S\ref{sec:custom}). \textit{(true)} \\
+\env{JOBOPS\_PUBLIC\_BASE\_URL} & Public URL emitted in artifact links. Set when running on a remote host (Tailscale / LAN / cloud) so links are reachable from your chat machine. See \S\ref{sec:remote-host}. \textit{(default: \texttt{http://127.0.0.1:<port>})} \\
+\env{JOBOPS\_LLM\_PROVIDER}     & \texttt{gemini} \textbar{} \texttt{deepseek} \textbar{} \texttt{none}. \textit{(gemini)} \\
+\env{JOBOPS\_LLM\_MODEL}        & Provider-specific model id. \textit{(empty \textrightarrow{} provider default)} \\
 \env{GEMINI\_API\_KEY}            & Gemini key. Needed only for \texttt{api}/batch paths. \\
 \env{DEEPSEEK\_API\_KEY}          & DeepSeek key. Same. \\
-\env{MCP\_JSA\_SCHEDULER\_ENABLED} & Whether opt-in cron runs at all. \textit{(false)} \\
+\env{JOBOPS\_SCHEDULER\_ENABLED} & Whether opt-in cron runs at all. \textit{(false)} \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
 \subsection*{Connecting your chat client(s): one server, every client}
 
-The recommended topology is \textbf{ONE long-running HTTP server = ONE source of truth}. Run \cmd{npx job\_ops-mcp start} once (locally, or on an always-on host over Tailscale) and point \emph{every} interface at the same \texttt{http://127.0.0.1:7891/mcp} endpoint: Claude Code (\cmd{claude mcp add --transport http}), Claude Desktop (via the \texttt{mcp-remote} stdio\textrightarrow{}HTTP bridge, or a paid-plan custom connector), opencode (\fpath{opencode.json}, \texttt{type: remote}), codex (\fpath{\textasciitilde/.codex/config.toml}, \texttt{url} + \texttt{bearer\_token\_env\_var}), gemini-cli (\fpath{settings.json}, \texttt{httpUrl}), LibreChat (\texttt{streamable-http}), and the tracker web UI. Because there is exactly one process and one SQLite DB behind all of them, materials, tracker moves, contacts, and packet edits made in any client are instantly visible in all the others \textemdash{} when one client is rate-limited, switch to another and continue where you left off.
+The recommended topology is \textbf{ONE long-running HTTP server = ONE source of truth}. Run \cmd{npx jobops start} once (locally, or on an always-on host over Tailscale) and point \emph{every} interface at the same \texttt{http://127.0.0.1:7891/mcp} endpoint: Claude Code (\cmd{claude mcp add --transport http}), Claude Desktop (via the \texttt{mcp-remote} stdio\textrightarrow{}HTTP bridge, or a paid-plan custom connector), opencode (\fpath{opencode.json}, \texttt{type: remote}), codex (\fpath{\textasciitilde/.codex/config.toml}, \texttt{url} + \texttt{bearer\_token\_env\_var}), gemini-cli (\fpath{settings.json}, \texttt{httpUrl}), LibreChat (\texttt{streamable-http}), and the tracker web UI. Because there is exactly one process and one SQLite DB behind all of them, materials, tracker moves, contacts, and packet edits made in any client are instantly visible in all the others \textemdash{} when one client is rate-limited, switch to another and continue where you left off.
 
-\cmd{npx job\_ops-mcp connect} prints copy-paste-ready config for each of those clients (flags: \flag{--host}, \flag{--port}, \flag{--token}). Concurrency is safe by design: every HTTP request gets an isolated MCP protocol instance, reads run concurrently (SQLite WAL), and all writes are serialized through one write lock in the single server process \textemdash{} no per-client spawn, no port conflicts, no corruption under multi-client load.
+\cmd{npx jobops connect} prints copy-paste-ready config for each of those clients (flags: \flag{--host}, \flag{--port}, \flag{--token}). Concurrency is safe by design: every HTTP request gets an isolated MCP protocol instance, reads run concurrently (SQLite WAL), and all writes are serialized through one write lock in the single server process \textemdash{} no per-client spawn, no port conflicts, no corruption under multi-client load.
 
-Verify all clients hit the same instance with \cmd{npx job\_ops-mcp status} (flags: \flag{--url}, \flag{--token}): it reports uptime, the source-of-truth DB path + a short fingerprint, and which MCP clients have connected since boot. The \tool{doctor} tool reports the same server-identity block from inside any chat.
+Verify all clients hit the same instance with \cmd{npx jobops status} (flags: \flag{--url}, \flag{--token}): it reports uptime, the source-of-truth DB path + a short fingerprint, and which MCP clients have connected since boot. The \tool{doctor} tool reports the same server-identity block from inside any chat.
 
-\textbf{Auth:} the moment the server is reachable beyond localhost it MUST run with \env{MCP\_JSA\_AUTH\_TOKEN} set (\S\ref{sec:security}) \textemdash{} it serves PII to every connected endpoint and refuses to boot remotely without the token. The token goes into each client's config; \cmd{connect} embeds it automatically when the env var is set.
+\textbf{Auth:} the moment the server is reachable beyond localhost it MUST run with \env{JOBOPS\_AUTH\_TOKEN} set (\S\ref{sec:security}) \textemdash{} it serves PII to every connected endpoint and refuses to boot remotely without the token. The token goes into each client's config; \cmd{connect} embeds it automatically when the env var is set.
 
 \textbf{Known issue (mcp-remote \texttimes{} Node $\geq$ 26):} \texttt{mcp-remote} ($\leq$ 0.1.38) fails under Node 26+ with \texttt{Unexpected content type: null} \textemdash{} its bundled undici \texttt{EnvHttpProxyAgent} global dispatcher strips response headers from Node's built-in \texttt{fetch}. The server's responses are spec-correct; the bridge mangles them client-side. Until fixed upstream, run the bridge under Node $\leq$ 24: replace \texttt{"command": "npx"} with an absolute path to a Node 24 binary and point \texttt{args} at a Node-24-installed \texttt{mcp-remote}. The symptom appears in Claude Desktop's \fpath{mcp-server-*.log} right after \texttt{Using transport strategy: http-first}.
 
-Below are the two configs you most likely want to paste by hand. The stdio config is the \emph{single-client} alternative: it spawns a private server inside Claude Desktop rather than connecting to the shared one (next to a running shared server it also needs its own \env{MCP\_JSA\_PORT}, or its file server fails with \texttt{EADDRINUSE}).
+Below are the two configs you most likely want to paste by hand. The stdio config is the \emph{single-client} alternative: it spawns a private server inside Claude Desktop rather than connecting to the shared one (next to a running shared server it also needs its own \env{JOBOPS\_PORT}, or its file server fails with \texttt{EADDRINUSE}).
 
 \subsubsection*{Claude Desktop (stdio transport — single-client alternative)}
 
 Claude Desktop's local MCP only speaks \textbf{stdio}, not HTTP \textemdash{} the
 \flag{--stdio} flag binds MCP to stdin/stdout. The HTTP file server still binds to
-\env{MCP\_JSA\_PORT} in the background so the \texttt{/files/*} artifact links the
+\env{JOBOPS\_PORT} in the background so the \texttt{/files/*} artifact links the
 chat returns still resolve in your browser.
 
 Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop\_config.json} on macOS (or \fpath{\%APPDATA\%/Claude/claude\_desktop\_config.json} on Windows):
@@ -463,12 +463,12 @@ Add to \fpath{\textasciitilde/Library/Application Support/Claude/claude\_desktop
 \begin{lstlisting}[language=json]
 {
   "mcpServers": {
-    "job_ops-mcp": {
+    "jobops": {
       "command": "npx",
-      "args": ["-y", "job_ops-mcp", "start", "--stdio"],
+      "args": ["-y", "jobops", "start", "--stdio"],
       "env": {
-        "MCP_JSA_PORT": "7891",
-        "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
+        "JOBOPS_PORT": "7891",
+        "JOBOPS_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
       }
     }
   }
@@ -483,13 +483,13 @@ In \fpath{librechat.yaml}, under top-level \texttt{mcpServers:}:
 
 \begin{lstlisting}[language=yaml]
 mcpServers:
-  job_ops-mcp:
+  jobops:
     type: streamable-http
     url: http://127.0.0.1:7891/mcp
     timeout: 60000
 \end{lstlisting}
 
-Boot the server separately (\cmd{npx job\_ops-mcp start}), then restart LibreChat.
+Boot the server separately (\cmd{npx jobops start}), then restart LibreChat.
 
 \subsubsection*{LibreChat (Docker)}
 
@@ -497,7 +497,7 @@ Inside a container, \texttt{127.0.0.1} points at the container itself \textemdas
 
 \begin{lstlisting}[language=yaml]
 mcpServers:
-  job_ops-mcp:
+  jobops:
     type: streamable-http
     url: http://host.docker.internal:7891/mcp
     timeout: 60000
@@ -521,34 +521,34 @@ cloud instance, a homelab box, or anything you reach over Tailscale / LAN / a tu
 \texttt{127.0.0.1} on the link resolves to your \textit{chat machine} \textemdash{} not the
 server \textemdash{} and the links don't work.
 
-Set \env{MCP\_JSA\_PUBLIC\_BASE\_URL} to the URL the chat machine actually uses to reach
+Set \env{JOBOPS\_PUBLIC\_BASE\_URL} to the URL the chat machine actually uses to reach
 the server:
 
 \begin{lstlisting}[language=bashplus]
 # Tailscale magic DNS
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
 
 # Tailscale 100.x IP
-export MCP_JSA_PUBLIC_BASE_URL="http://100.64.0.5:7891"
+export JOBOPS_PUBLIC_BASE_URL="http://100.64.0.5:7891"
 
 # LAN IP
-export MCP_JSA_PUBLIC_BASE_URL="http://192.168.1.20:7891"
+export JOBOPS_PUBLIC_BASE_URL="http://192.168.1.20:7891"
 
 # Reverse proxy
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.com"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.com"
 \end{lstlisting}
 
 Every artifact link (resume PDF, .tex, .docx, eval report, apply\_prefill screenshot,
 tracker URL) now uses that base. No other behaviour changes \textemdash{} the server still
-binds to \env{MCP\_JSA\_HOST} (default \texttt{127.0.0.1}); to accept connections from other
-devices, also set \env{MCP\_JSA\_HOST=0.0.0.0}. \cmd{npx job\_ops-mcp doctor} prints the
+binds to \env{JOBOPS\_HOST} (default \texttt{127.0.0.1}); to accept connections from other
+devices, also set \env{JOBOPS\_HOST=0.0.0.0}. \cmd{npx jobops doctor} prints the
 effective public base URL so you can confirm what your links will look like. A malformed
 value is rejected at boot with a warning on stderr; the server keeps running with the
 default 127.0.0.1 base. Trailing slashes are stripped.
 
 \begin{warnbox}[Exposing beyond localhost]
 This setting only changes the URLs the server emits. It does NOT add authentication and
-does NOT change the bind address. If you set \env{MCP\_JSA\_HOST=0.0.0.0} so the server
+does NOT change the bind address. If you set \env{JOBOPS\_HOST=0.0.0.0} so the server
 accepts remote connections, the HTTP file server then serves your resume PDFs, cover
 letters, eval reports, LinkedIn-derived data, and H1B-derived data \textbf{without
 authentication} to anyone who can reach the port. Restrict access to a private network
@@ -563,15 +563,15 @@ The default behavior of every reasoning tool is \texttt{mode: chat} \textemdash{
 For \emph{server-side} scoring (\tool{batch\_evaluate}, or \texttt{mode: api} on tools that accept it), the server will use \textbf{MCP sampling} \textemdash{} asking your connected client's model directly, with \textbf{no API key} \textemdash{} \emph{but only if that client advertises the \texttt{sampling} capability}. Most clients, \textbf{including Claude Desktop as of now, do NOT}, so in practice you set a BYO key for server-side scoring (see \S\ref{sec:mcp-features} and \href{https://modelcontextprotocol.io/clients}{modelcontextprotocol.io/clients}). To configure the BYO key:
 
 \begin{lstlisting}[language=bashplus]
-export MCP_JSA_LLM_PROVIDER=gemini
+export JOBOPS_LLM_PROVIDER=gemini
 export GEMINI_API_KEY=...      # free tier covers ordinary single-user usage
 
 # or
-export MCP_JSA_LLM_PROVIDER=deepseek
+export JOBOPS_LLM_PROVIDER=deepseek
 export DEEPSEEK_API_KEY=...
 
 # Force the BYO-key path even when the client could sample:
-export MCP_JSA_SAMPLING=false
+export JOBOPS_SAMPLING=false
 \end{lstlisting}
 
 \tool{cost\_estimate} reports cumulative spend per provider per tool; sampling calls are flagged client-borne (\$0 server cost).
@@ -810,7 +810,7 @@ At 1000+ jobs the dashboard paginates \emph{server-side} (SQL \texttt{WHERE}/\te
 \end{description}
 
 \begin{notebox}
-When \env{MCP\_JSA\_VISA\_SCORING=false}, all three visa tools are hidden from \texttt{tools/list} and the score formula renormalizes to \texttt{0.6 \(\cdot\) resume + 0.4 \(\cdot\) taste}. See \S\ref{sec:custom}.
+When \env{JOBOPS\_VISA\_SCORING=false}, all three visa tools are hidden from \texttt{tools/list} and the score formula renormalizes to \texttt{0.6 \(\cdot\) resume + 0.4 \(\cdot\) taste}. See \S\ref{sec:custom}.
 \end{notebox}
 
 \subsection*{Interview / offer}
@@ -1192,7 +1192,7 @@ taglines:
   "Forward-Deployed":    "embeds with customers and closes the deal"
 \end{lstlisting}
 
-On the next \texttt{reseed} (CLI \texttt{npx job\_ops-mcp reseed} or the \tool{reseed\_career\_packet} tool) these auto-populate Section 2 \textemdash{} one bullet per archetype. The field is backwards-compatible: omit it entirely and Section 2 keeps the editable template placeholders exactly as before.
+On the next \texttt{reseed} (CLI \texttt{npx jobops reseed} or the \tool{reseed\_career\_packet} tool) these auto-populate Section 2 \textemdash{} one bullet per archetype. The field is backwards-compatible: omit it entirely and Section 2 keeps the editable template placeholders exactly as before.
 
 \subsection*{Company alias / fuzzy matching}
 
@@ -1203,14 +1203,14 @@ Company names arrive in different legal forms across data sources \textemdash{} 
 Visa signal exists because the system's original author was on OPT/STEM-OPT and needed to filter for visa-friendly employers. If you don't need that \textemdash{} US citizens, non-US users, anyone scoring roles where sponsorship is irrelevant \textemdash{} set:
 
 \begin{lstlisting}[language=bashplus]
-export MCP_JSA_VISA_SCORING=false
+export JOBOPS_VISA_SCORING=false
 \end{lstlisting}
 
 When disabled, the server:
 
 \begin{itemize}
 \item Drops \texttt{visa\_fit} from the rubric. \texttt{score\_total = round(0.6 \(\cdot\) resume\_fit + 0.4 \(\cdot\) taste\_fit)} \textemdash{} enforced server-side regardless of what the chat returns.
-\item Prepends a ``VISA SCORING DISABLED'' override block to the top of the \texttt{mcp-jsa://modes/rubric} resource.
+\item Prepends a ``VISA SCORING DISABLED'' override block to the top of the \texttt{jobops://modes/rubric} resource.
 \item Hides \tool{visa\_signal}, \tool{import\_h1b}, \tool{import\_linkedin} from \texttt{tools/list}.
 \item Strips \texttt{score\_visa\_fit} from \tool{get\_top\_jobs} items and the eval-report HTML badge.
 \item Records \texttt{visa\_scoring\_enabled: false} in every \texttt{score\_detail} blob so you can audit which formula scored a given row.
@@ -1274,17 +1274,17 @@ mkdir -p ~/job-themes/compact
 # Author resume.tex / cover.tex / resume.html / cover.html -- copy the
 # bundled default as a starting point and edit the preamble or layout.
 
-export MCP_JSA_TEMPLATE_DIR=~/job-themes
-npx job_ops-mcp templates             # lists bundled + user themes
+export JOBOPS_TEMPLATE_DIR=~/job-themes
+npx jobops templates             # lists bundled + user themes
 
 # Then in your MCP chat, pass template= to render_pdf:
 #   render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact"
 \end{lstlisting}
 
-The loader checks \texttt{\$MCP\_JSA\_TEMPLATE\_DIR} first, so a \fpath{default/} directory in your themes dir overrides the bundled default. To make a custom theme the implicit default for every \tool{render\_pdf} call (instead of passing \texttt{template=...}):
+The loader checks \texttt{\$JOBOPS\_TEMPLATE\_DIR} first, so a \fpath{default/} directory in your themes dir overrides the bundled default. To make a custom theme the implicit default for every \tool{render\_pdf} call (instead of passing \texttt{template=...}):
 
 \begin{lstlisting}[language=bashplus]
-export MCP_JSA_DEFAULT_TEMPLATE=compact
+export JOBOPS_DEFAULT_TEMPLATE=compact
 \end{lstlisting}
 
 Hard rules still apply regardless of theme: the visa-leakage scan runs on \texttt{cover\_body} \emph{before} substitution, so a custom template cannot inject visa/work-auth language. A theme that omits a placeholder silently drops that section (graceful degradation); in \fpath{.tex} themes, commenting a placeholder out (\texttt{\% \{\{SUMMARY\_SECTION\}\}}) drops the section the same way \textemdash{} substitution skips LaTeX comments. A theme missing \verb|\documentclass| or \verb|\begin{document}| produces an error that quotes the theme name + file path \textemdash{} pdflatex's own backtrace never reaches the user.
@@ -1305,7 +1305,7 @@ Sampling and elicitation are server\(\rightarrow\)client \emph{requests} that th
 The \texttt{api}-path scorers (\tool{batch\_evaluate}, \tool{evaluate\_job} \texttt{mode="api"}) will use \textbf{sampling}: the server issues a \texttt{sampling/createMessage} request to the connected client and the \emph{client's own model} produces the completion \textemdash{} same rubric, same strict-JSON contract as the BYO-key path. One \texttt{Completer} abstraction (\fpath{src/core/scoring.ts}) backs both, and \tool{evaluate\_job}/\tool{batch\_evaluate} report \texttt{scored\_via: "sampling"} or \texttt{"api"}. This engages \textbf{automatically if (and only if) a sampling-capable client connects} \textemdash{} no configuration needed.
 
 \begin{itemize}
-\item \textbf{Selection order:} sampling (only if the client advertised \texttt{sampling} \emph{and} \texttt{MCP\_JSA\_SAMPLING}\,$\neq$\,\texttt{false}) \(\rightarrow\) BYO key (\texttt{MCP\_JSA\_LLM\_PROVIDER} + key) \(\rightarrow\) otherwise \tool{evaluate\_job} \texttt{mode="chat"} still works (the chat scores it). On a client without sampling (e.g. Claude Desktop), set the BYO key for \tool{batch\_evaluate} / \texttt{mode="api"}.
+\item \textbf{Selection order:} sampling (only if the client advertised \texttt{sampling} \emph{and} \texttt{JOBOPS\_SAMPLING}\,$\neq$\,\texttt{false}) \(\rightarrow\) BYO key (\texttt{JOBOPS\_LLM\_PROVIDER} + key) \(\rightarrow\) otherwise \tool{evaluate\_job} \texttt{mode="chat"} still works (the chat scores it). On a client without sampling (e.g. Claude Desktop), set the BYO key for \tool{batch\_evaluate} / \texttt{mode="api"}.
 \item \textbf{Cost:} when sampling \emph{is} used it runs on the client's model, so the client bears the cost. \tool{cost\_estimate} records every sampling call flagged \texttt{cost\_borne\_by: client} with a \$0 server estimate, so the total is not misread.
 \end{itemize}
 
@@ -1317,7 +1317,7 @@ For \textbf{sensitive inputs} (a LinkedIn export path, credentials) the server u
 
 \subsection*{Auth \textemdash{} the remote / PII surface}
 
-See \S\ref{sec:security} below for the full table. In short: localhost-only stays open and frictionless; binding to anything else requires \texttt{MCP\_JSA\_AUTH\_TOKEN} or the server refuses to start.
+See \S\ref{sec:security} below for the full table. In short: localhost-only stays open and frictionless; binding to anything else requires \texttt{JOBOPS\_AUTH\_TOKEN} or the server refuses to start.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Security: auth + the PII surface}\label{sec:security}
@@ -1338,13 +1338,13 @@ non-localhost                & set   & \textbf{Token required} \textemdash{} bea
 \end{tabularx}
 \end{center}
 
-When a token is required, \texttt{/mcp}, \texttt{/files/*}, and the dashboard (\texttt{/}) demand \texttt{Authorization:\ Bearer <token>}. A missing/invalid token returns \texttt{401} with a \texttt{WWW-Authenticate} header pointing at \texttt{/.well-known/oauth-protected-resource}. This realizes the MCP 2025-06-18 ``server as OAuth Resource Server'' model to the extent practical for a self-hosted single-user tool: one operator-provisioned static token (\texttt{MCP\_JSA\_AUTH\_TOKEN}), no full authorization-server flow.
+When a token is required, \texttt{/mcp}, \texttt{/files/*}, and the dashboard (\texttt{/}) demand \texttt{Authorization:\ Bearer <token>}. A missing/invalid token returns \texttt{401} with a \texttt{WWW-Authenticate} header pointing at \texttt{/.well-known/oauth-protected-resource}. This realizes the MCP 2025-06-18 ``server as OAuth Resource Server'' model to the extent practical for a self-hosted single-user tool: one operator-provisioned static token (\texttt{JOBOPS\_AUTH\_TOKEN}), no full authorization-server flow.
 
 \begin{lstlisting}[language=bashplus]
-export MCP_JSA_HOST=0.0.0.0
-export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
-npx job_ops-mcp start
+export JOBOPS_HOST=0.0.0.0
+export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+npx jobops start
 \end{lstlisting}
 
 \textbf{Protected:} \texttt{/mcp}, \texttt{/files/*}, \texttt{/}. \textbf{Open by design:} \texttt{/healthz} (liveness, no PII) and the discovery metadata. The URL-mode elicitation capture form (\texttt{/elicit/:id}) is gated by an unguessable one-time id rather than the bearer token, so you can complete it in a browser. \textbf{Hard rule:} PII must never be served unauthenticated to a network \textemdash{} the default-deny boot guard makes a missing token fail loudly instead of silently exposing your data. Even with a token, prefer a private network (Tailscale / VPN / authenticated reverse proxy) over the public internet.
@@ -1375,7 +1375,7 @@ Every tool that mutates the tracker / applications / outreach goes through \text
 \end{warnbox}
 
 \begin{warnbox}[Rule 6: PII is never served unauthenticated to a network]
-Binding to a non-localhost host without \texttt{MCP\_JSA\_AUTH\_TOKEN} makes the server \textbf{refuse to boot} (default-deny). When a token is set, \texttt{/mcp}, \texttt{/files/*}, and the dashboard require a bearer token; only \texttt{/healthz} + discovery metadata stay open. Resume PDFs, LinkedIn connections, and H1B data never reach an unauthenticated remote caller. See \S\ref{sec:security}.
+Binding to a non-localhost host without \texttt{JOBOPS\_AUTH\_TOKEN} makes the server \textbf{refuse to boot} (default-deny). When a token is set, \texttt{/mcp}, \texttt{/files/*}, and the dashboard require a bearer token; only \texttt{/healthz} + discovery metadata stay open. Resume PDFs, LinkedIn connections, and H1B data never reach an unauthenticated remote caller. See \S\ref{sec:security}.
 \end{warnbox}
 
 \medskip
@@ -1406,23 +1406,23 @@ A failing draft is returned to the chat with the specific rule + offending hit s
 \subsection*{Setup issues}
 
 \begin{description}
-\item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx job\_ops-mcp start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
+\item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx jobops start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
 
-\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline with the \flag{--stdio} flag; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx job\_ops-mcp doctor} to confirm.
+\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline with the \flag{--stdio} flag; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx jobops doctor} to confirm.
 
 \item[\textit{LibreChat shows ``connected'' but every call fails}] You're in Docker, the LibreChat container can't reach your host's \texttt{127.0.0.1}. Swap to \texttt{host.docker.internal} \textbf{and} add the entry to \texttt{mcpSettings.allowedAddresses}. On Linux, add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to docker-compose.yml.
 
-\item[\textit{LLM tools error with ``No LLM provider configured''}] Set \env{MCP\_JSA\_LLM\_PROVIDER} + the matching API key. The default \texttt{chat} mode of every tool works without one \textemdash{} only \tool{batch\_evaluate} and \texttt{mode: api} need a key.
+\item[\textit{LLM tools error with ``No LLM provider configured''}] Set \env{JOBOPS\_LLM\_PROVIDER} + the matching API key. The default \texttt{chat} mode of every tool works without one \textemdash{} only \tool{batch\_evaluate} and \texttt{mode: api} need a key.
 
-\item[\textit{Migrations didn't run}] The server applies pending migrations on first DB open. If the \fpath{data/} directory is on a read-only filesystem, the boot will error. Set \env{MCP\_JSA\_DATA\_DIR} to a writable path and re-run.
+\item[\textit{Migrations didn't run}] The server applies pending migrations on first DB open. If the \fpath{data/} directory is on a read-only filesystem, the boot will error. Set \env{JOBOPS\_DATA\_DIR} to a writable path and re-run.
 
-\item[\textit{Doctor says ``cv.md missing''} but it's in the directory] You probably launched from a different CWD than where \cmd{init} ran. Set \env{MCP\_JSA\_PROJECT\_ROOT} to the absolute path, or \cmd{cd} into the right directory before \cmd{start}.
+\item[\textit{Doctor says ``cv.md missing''} but it's in the directory] You probably launched from a different CWD than where \cmd{init} ran. Set \env{JOBOPS\_PROJECT\_ROOT} to the absolute path, or \cmd{cd} into the right directory before \cmd{start}.
 \end{description}
 
 \subsection*{Conceptual FAQ}
 
 \begin{description}
-\item[Does this work without visa data?] Yes. \env{MCP\_JSA\_VISA\_SCORING=false} drops the visa surface entirely \textemdash{} formula renormalizes, tools hidden, columns stripped. Use the system exactly as documented; only the visa-specific bits go quiet.
+\item[Does this work without visa data?] Yes. \env{JOBOPS\_VISA\_SCORING=false} drops the visa surface entirely \textemdash{} formula renormalizes, tools hidden, columns stripped. Use the system exactly as documented; only the visa-specific bits go quiet.
 
 \item[Does this work outside the US?] Yes. The defaults assume no specific market. Edit \fpath{modes/*.md} to match your local language / comp norms, add region-specific portals to \fpath{portals.yml}, and adjust \texttt{title\_filter}.
 
@@ -1432,7 +1432,7 @@ A failing draft is returned to the chat with the specific rule + offending hit s
 
 \item[Can I run two of these on the same machine?] Yes \textemdash{} pick different ports and project roots. Each gets its own SQLite file; the two never interact.
 
-\item[Where does the SQLite file go?] By default, \texttt{<project\_root>/data/mcp-jsa.db}. Override with \env{MCP\_JSA\_DATA\_DIR}.
+\item[Where does the SQLite file go?] By default, \texttt{<project\_root>/data/jobops.db}. Override with \env{JOBOPS\_DATA\_DIR}.
 
 \item[How big does the DB get?] After 6 months of daily use with 10\textendash{}20k jobs scored, expect ~50\textendash{}100 MB. SQLite handles that comfortably with WAL mode. Back up by copying the directory; nothing else.
 
@@ -1466,7 +1466,7 @@ If you find yourself \textbf{tweaking the rubric instead of clicking send}, the 
 \vfill
 \begin{flushright}
 \small\color{black!50}\sffamily
-job\_ops-mcp \textbullet{} v0.6.0 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/job_ops-mcp}
+jobops \textbullet{} v0.6.0 \textbullet{} MIT \textbullet{} \url{https://github.com/mohith-das/jobops}
 \end{flushright}
 
 \end{document}

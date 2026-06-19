@@ -1,6 +1,6 @@
 # Authoring custom resume / cover-letter themes
 
-`job_ops-mcp` ships with a default theme that produces ATS-clean, pdflatex-compatible
+`jobops` ships with a default theme that produces ATS-clean, pdflatex-compatible
 output. You can author your own themes — for visual style, alternate layouts, multiple
 target roles — and the renderer will substitute the same tailored content into them.
 
@@ -12,7 +12,7 @@ This guide is the reference for the placeholder contract a theme must satisfy.
 2. Export it:
 
    ```bash
-   export MCP_JSA_TEMPLATE_DIR=~/job-themes
+   export JOBOPS_TEMPLATE_DIR=~/job-themes
    ```
 
 3. Create a theme dir, e.g. `~/job-themes/compact/`, and add any subset of:
@@ -27,7 +27,7 @@ This guide is the reference for the placeholder contract a theme must satisfy.
 4. List what the loader sees:
 
    ```bash
-   npx job_ops-mcp templates
+   npx jobops templates
    ```
 
 5. Render with it:
@@ -41,14 +41,14 @@ This guide is the reference for the placeholder contract a theme must satisfy.
    Or pin it as the default for every call:
 
    ```bash
-   export MCP_JSA_DEFAULT_TEMPLATE=compact
+   export JOBOPS_DEFAULT_TEMPLATE=compact
    ```
 
 ## Search order
 
 When you request `template=<name>`, the loader checks in this order:
 
-1. `$MCP_JSA_TEMPLATE_DIR/<name>/`        ← your dir, highest priority
+1. `$JOBOPS_TEMPLATE_DIR/<name>/`        ← your dir, highest priority
 2. `<install>/templates/themes/<name>/`   ← bundled themes
 
 Same-name themes shadow: a `default/` folder in your dir **overrides** the bundled
@@ -79,7 +79,7 @@ target format. You should NOT wrap the placeholder in another escape pass.
 | `{{EXPERIENCE_SECTION}}`     | `\section*{Experience}\n<per-role blocks>\n`. Each role: company \hfill period, role + location, then `\begin{itemize}…\end{itemize}` bullets.                                                                                              |
 | `{{PROJECTS_SECTION}}`       | `\section*{Projects}\n<per-project blocks>\n`. Each project: bold title, optional badge, em-dash, description, optional tech footnote.                                                                                                      |
 | `{{EDUCATION_SECTION}}`      | `\section*{Education}\n<per-school blocks>\n`.                                                                                                                                                                                              |
-| `{{CERTIFICATIONS_SECTION}}` | Empty by default — `job_ops-mcp` does not surface certifications from `cv.md` at this layer. Custom themes that want a hard-coded section can ignore this placeholder and write the section verbatim, or omit it.                          |
+| `{{CERTIFICATIONS_SECTION}}` | Empty by default — `jobops` does not surface certifications from `cv.md` at this layer. Custom themes that want a hard-coded section can ignore this placeholder and write the section verbatim, or omit it.                          |
 
 Minimal valid `resume.tex`:
 
@@ -192,7 +192,7 @@ These run regardless of which theme you select:
 | Template empty / no `\documentclass` / no `\begin{document}` / no `<html>` tag | Single-line error naming the theme + file path. The renderer **never** ships a half-broken artifact to disk. |
 | Template references a placeholder the renderer doesn't fill | Replaced with empty string. No error. |
 | Renderer fills a placeholder the template doesn't reference | Silently dropped. No error. |
-| Configured `MCP_JSA_DEFAULT_TEMPLATE` doesn't exist on disk | Stderr warning, falls back to `"default"`. The server still boots. |
+| Configured `JOBOPS_DEFAULT_TEMPLATE` doesn't exist on disk | Stderr warning, falls back to `"default"`. The server still boots. |
 
 ## Verifying a custom theme
 
@@ -222,6 +222,6 @@ you want CI verification for your own themes.
 
 ## Where to ask for help
 
-If a custom theme produces a non-obvious error, run with `MCP_JSA_DEBUG=1` (TODO)
+If a custom theme produces a non-obvious error, run with `JOBOPS_DEBUG=1` (TODO)
 or paste the renderer's error line into an issue. The error always quotes the
 theme name + the file path, so issues with the loader are unambiguous to triage.

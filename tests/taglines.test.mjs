@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // NB: profile.js loads the config singleton on import (freezing projectRoot). We must set
-// MCP_JSA_PROJECT_ROOT in before() BEFORE the first import, so every import here is dynamic.
+// JOBOPS_PROJECT_ROOT in before() BEFORE the first import, so every import here is dynamic.
 
 // ── Part A: normalizeTaglines ──────────────────────────────────────────────────
 
@@ -52,9 +52,9 @@ test('normalizeTaglines: absent/garbage → [] (back-compat signal)', async () =
 let sandbox;
 before(async () => {
   sandbox = mkdtempSync(join(tmpdir(), 'jobops-taglines-'));
-  process.env.MCP_JSA_DATA_DIR     = sandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = sandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_DATA_DIR     = sandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = sandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
   const { getDb } = await import('../dist/db.js');
   getDb();
 });

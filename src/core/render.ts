@@ -38,7 +38,7 @@ export interface RenderArgs {
   kind:   'resume' | 'cover' | 'both';
   cover_body?: string;     // milestone 1 takes whatever the chat sends; m2 reads applications.cover_letter_draft
   page_format?: 'a4' | 'letter';
-  /** Theme name (see core/templates.ts). Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+  /** Theme name (see core/templates.ts). Defaults to JOBOPS_DEFAULT_TEMPLATE or "default". */
   theme?: string;
   /** Pre-computed content (defaults to cvForRender(job_id)) — lets one tool call share one snapshot across formats. */
   cv?: CVData;

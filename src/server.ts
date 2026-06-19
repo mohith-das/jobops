@@ -1,9 +1,9 @@
 // Entrypoint. One process, two transport modes:
 //
-//   HTTP   (default)   — npx job_ops-mcp start
-//     MCP transport + file server + tracker dashboard, all on MCP_JSA_PORT.
+//   HTTP   (default)   — npx jobops start
+//     MCP transport + file server + tracker dashboard, all on JOBOPS_PORT.
 //
-//   stdio  (Claude Desktop)  — npx job_ops-mcp start --stdio
+//   stdio  (Claude Desktop)  — npx jobops start --stdio
 //     MCP transport on stdin/stdout; HTTP file server still runs on the port
 //     so /files/* artifact links the chat returns still resolve in a browser.
 //
@@ -44,8 +44,8 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
       `\n[fatal] Refusing to start: ${config.authPolicy.reason}\n` +
       `  Bind host:   ${config.host}\n` +
       `  Fix (pick one):\n` +
-      `    • Bind to localhost only (default):  unset MCP_JSA_HOST (or set it to 127.0.0.1)\n` +
-      `    • Expose remotely WITH auth:         export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"\n` +
+      `    • Bind to localhost only (default):  unset JOBOPS_HOST (or set it to 127.0.0.1)\n` +
+      `    • Expose remotely WITH auth:         export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"\n` +
       `  Never expose resume PDFs / LinkedIn / H1B data to a network without a token.\n`,
     );
     process.exit(1);
@@ -69,11 +69,11 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
   const server = app.listen(config.port, config.host, () => {
     const pubLine = config.publicBaseUrlIsExplicit
       ? `  · Public URL:     ${config.publicBaseUrl}  (artifact links emit this)`
-      : `  · Public URL:     ${config.publicBaseUrl}  (default — set MCP_JSA_PUBLIC_BASE_URL to override)`;
+      : `  · Public URL:     ${config.publicBaseUrl}  (default — set JOBOPS_PUBLIC_BASE_URL to override)`;
     const lines = opts.stdio
       ? [
           '',
-          `▷ job_ops-mcp stdio mode`,
+          `▷ jobops stdio mode`,
           `  · MCP transport:  stdin/stdout`,
           `  · Listen URL:     ${config.listenUrl}  (HTTP file server bound here)`,
           pubLine,
@@ -87,7 +87,7 @@ export async function bootServer(opts: BootOptions = {}): Promise<void> {
         ]
       : [
           '',
-          `▷ job_ops-mcp listening on ${config.listenUrl}`,
+          `▷ jobops listening on ${config.listenUrl}`,
           `  · MCP endpoint:   ${config.listenUrl}/mcp`,
           `  · Tracker UI:     ${config.listenUrl}/`,
           `  · File server:    ${config.listenUrl}/files/*`,

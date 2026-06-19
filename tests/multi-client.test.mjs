@@ -9,7 +9,7 @@
 //      user can verify all clients hit the same instance.
 //
 // One Express app on one ephemeral port serves every "client" here — exactly the
-// production shape of `npx job_ops-mcp start` (no per-client spawn, no EADDRINUSE).
+// production shape of `npx jobops start` (no per-client spawn, no EADDRINUSE).
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,11 +36,11 @@ Remote · 2024 – Present
   writeFileSync(resolve(sandbox, 'config/profile.yml'), `candidate:\n  full_name: "Casey Riley"\n  email: "casey@example.com"\n`);
   writeFileSync(resolve(sandbox, 'portals.yml'), `tracked_companies: []\n`);
 
-  process.env.MCP_JSA_DATA_DIR     = resolve(sandbox, 'data');
-  process.env.MCP_JSA_OUTPUT_DIR   = resolve(sandbox, 'output');
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
-  delete process.env.MCP_JSA_AUTH_TOKEN;
-  delete process.env.MCP_JSA_HOST;
+  process.env.JOBOPS_DATA_DIR     = resolve(sandbox, 'data');
+  process.env.JOBOPS_OUTPUT_DIR   = resolve(sandbox, 'output');
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
+  delete process.env.JOBOPS_AUTH_TOKEN;
+  delete process.env.JOBOPS_HOST;
 
   const { getDb } = await import('../dist/db.js');
   getDb();
@@ -166,7 +166,7 @@ test('/api/status reports the shared DB and the clients seen', async () => {
   assert.equal(r.status, 200);
   const s = await r.json();
 
-  assert.equal(s.db_path, resolve(sandbox, 'data', 'mcp-jsa.db'), 'status must name the one source-of-truth DB');
+  assert.equal(s.db_path, resolve(sandbox, 'data', 'jobops.db'), 'status must name the one source-of-truth DB');
   assert.match(s.db_fingerprint, /^[0-9a-f]{12}$/);
   assert.ok(s.uptime_s >= 0);
   assert.ok(s.mcp_requests_total >= 18, `expected the test traffic counted (got ${s.mcp_requests_total})`);

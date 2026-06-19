@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '..');
 
 let sandbox;       // project root
-let userThemeDir;  // MCP_JSA_TEMPLATE_DIR target
+let userThemeDir;  // JOBOPS_TEMPLATE_DIR target
 
 // Each test imports from a cache-busted module URL so config + theme state
 // reloads cleanly per env-var change.
@@ -112,12 +112,12 @@ Remote · 2024 – Present
   mkdirSync(overrideDir, { recursive: true });
   writeFileSync(resolve(overrideDir, 'resume.tex'), `% USER OVERRIDE MARKER\n\\documentclass[letterpaper,11pt]{article}\n\\begin{document}\n{{HEADER}}\n\\end{document}\n`);
 
-  process.env.MCP_JSA_DATA_DIR     = resolve(sandbox, 'data');
-  process.env.MCP_JSA_OUTPUT_DIR   = resolve(sandbox, 'output');
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_DATA_DIR     = resolve(sandbox, 'data');
+  process.env.JOBOPS_OUTPUT_DIR   = resolve(sandbox, 'output');
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
   // Default to NO user-dir override; tests that need it set it then unset it.
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
-  delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
+  delete process.env.JOBOPS_DEFAULT_TEMPLATE;
   const { getDb } = await fresh('../dist/db.js');
   getDb();
 });
@@ -127,7 +127,7 @@ after(() => { if (sandbox) rmSync(sandbox, { recursive: true, force: true }); })
 // ── Theme discovery ────────────────────────────────────────────────────────
 
 test('listThemes returns the bundled default when no user dir is set', async () => {
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
   const { listThemes } = await fresh('../dist/core/templates.js');
   const themes = listThemes();
   assert.ok(themes.length >= 1, 'at least the bundled default theme is visible');
@@ -141,7 +141,7 @@ test('listThemes returns the bundled default when no user dir is set', async () 
 });
 
 test('listThemes surfaces user-dir themes alongside bundled', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { listThemes } = await fresh('../dist/core/templates.js');
   const themes = listThemes();
   const names  = themes.map(t => t.name);
@@ -155,7 +155,7 @@ test('listThemes surfaces user-dir themes alongside bundled', async () => {
 
 test('listThemes also includes the bundled "broken" theme even though it is malformed', async () => {
   // The loader's job is discovery; validation happens at load-time.
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { listThemes } = await fresh('../dist/core/templates.js');
   assert.ok(listThemes().some(t => t.name === 'broken'),
     '"broken" is discoverable even if its files are malformed');
@@ -164,7 +164,7 @@ test('listThemes also includes the bundled "broken" theme even though it is malf
 // ── Theme resolution ───────────────────────────────────────────────────────
 
 test('resolveTheme finds bundled "default" with no user dir', async () => {
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
   const { resolveTheme } = await fresh('../dist/core/templates.js');
   const t = resolveTheme('default');
   assert.equal(t.name, 'default');
@@ -172,7 +172,7 @@ test('resolveTheme finds bundled "default" with no user dir', async () => {
 });
 
 test('resolveTheme picks the user-dir version when the name collides', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { resolveTheme } = await fresh('../dist/core/templates.js');
   const t = resolveTheme('default');
   assert.equal(t.source, 'user');
@@ -180,7 +180,7 @@ test('resolveTheme picks the user-dir version when the name collides', async () 
 });
 
 test('resolveTheme errors clearly with the theme name when not found', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { resolveTheme } = await fresh('../dist/core/templates.js');
   assert.throws(() => resolveTheme('does-not-exist'),
     err => /Unknown template theme "does-not-exist"/.test(err.message)
@@ -196,7 +196,7 @@ test('resolveTheme rejects unsafe names', async () => {
 // ── Template loading + validation ──────────────────────────────────────────
 
 test('loadTemplate returns the body of bundled default/resume.tex', async () => {
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
   const { loadTemplate } = await fresh('../dist/core/templates.js');
   const t = loadTemplate('default', 'resume.tex');
   assert.match(t.body, /\\documentclass/);
@@ -207,7 +207,7 @@ test('loadTemplate returns the body of bundled default/resume.tex', async () => 
 });
 
 test('loadTemplate errors with theme name when the file is missing in the theme', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { loadTemplate } = await fresh('../dist/core/templates.js');
   // compact only ships resume.tex + cover.tex — no HTML files.
   assert.throws(() => loadTemplate('compact', 'resume.html'),
@@ -216,7 +216,7 @@ test('loadTemplate errors with theme name when the file is missing in the theme'
 });
 
 test('loadTemplate errors clearly when the template is malformed', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { loadTemplate } = await fresh('../dist/core/templates.js');
   assert.throws(() => loadTemplate('broken', 'resume.tex'),
     err => /template "broken\/resume\.tex"/.test(err.message)
@@ -243,8 +243,8 @@ test('fillTemplate is single-pass — placeholder content does not re-expand', a
 // ── render_tex with default vs custom themes ───────────────────────────────
 
 test('buildResumeTex with default theme contains every section block', async () => {
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
-  delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
+  delete process.env.JOBOPS_DEFAULT_TEMPLATE;
   const { buildResumeTex } = await fresh('../dist/core/render_tex.js');
   const tex = buildResumeTex();
   // Default has Summary + Skills + Experience + Education sections (Projects
@@ -259,7 +259,7 @@ test('buildResumeTex with default theme contains every section block', async () 
 });
 
 test('buildResumeTex with theme="compact" only emits HEADER + Experience', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { buildResumeTex } = await fresh('../dist/core/render_tex.js');
   const tex = buildResumeTex({ theme: 'compact' });
   // Compact omits Summary/Skills/Education/Projects placeholders entirely.
@@ -273,7 +273,7 @@ test('buildResumeTex with theme="compact" only emits HEADER + Experience', async
 });
 
 test('buildCoverTex with theme="compact" produces a valid pdflatex-able document', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { buildCoverTex } = await fresh('../dist/core/render_tex.js');
   const tex = buildCoverTex({
     body:     'Reaching out about the role. Excited about your work.\n\nLooking forward.',
@@ -293,14 +293,14 @@ test('buildCoverTex with theme="compact" produces a valid pdflatex-able document
 });
 
 test('unknown theme errors before any output is produced', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { buildResumeTex } = await fresh('../dist/core/render_tex.js');
   assert.throws(() => buildResumeTex({ theme: 'no-such-theme' }),
     err => /Unknown template theme "no-such-theme"/.test(err.message));
 });
 
 test('malformed theme errors with the theme name and file path', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { buildResumeTex } = await fresh('../dist/core/render_tex.js');
   assert.throws(() => buildResumeTex({ theme: 'broken' }),
     err => /theme="broken"/.test(err.message)
@@ -310,7 +310,7 @@ test('malformed theme errors with the theme name and file path', async () => {
 // ── Visa-leakage rail still fires regardless of theme ─────────────────────
 
 test('visa scan still catches a leak in a custom-theme cover.tex', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR = userThemeDir;
+  process.env.JOBOPS_TEMPLATE_DIR = userThemeDir;
   const { buildCoverTex } = await fresh('../dist/core/render_tex.js');
   const { scanForVisaLeakage } = await fresh('../dist/core/outreach_safety.js');
   const tex = buildCoverTex({
@@ -325,26 +325,26 @@ test('visa scan still catches a leak in a custom-theme cover.tex', async () => {
   assert.ok(leaks.some(l => l.rule === 'no_visa_mentions'));
 });
 
-// ── effectiveDefaultTemplate + MCP_JSA_DEFAULT_TEMPLATE ───────────────────
+// ── effectiveDefaultTemplate + JOBOPS_DEFAULT_TEMPLATE ───────────────────
 
 test('effectiveDefaultTemplate returns "default" by default', async () => {
-  delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
+  delete process.env.JOBOPS_DEFAULT_TEMPLATE;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
   const { effectiveDefaultTemplate } = await fresh('../dist/core/templates.js');
   assert.equal(effectiveDefaultTemplate(), 'default');
 });
 
-test('effectiveDefaultTemplate honours MCP_JSA_DEFAULT_TEMPLATE when valid', async () => {
-  process.env.MCP_JSA_TEMPLATE_DIR     = userThemeDir;
-  process.env.MCP_JSA_DEFAULT_TEMPLATE = 'compact';
+test('effectiveDefaultTemplate honours JOBOPS_DEFAULT_TEMPLATE when valid', async () => {
+  process.env.JOBOPS_TEMPLATE_DIR     = userThemeDir;
+  process.env.JOBOPS_DEFAULT_TEMPLATE = 'compact';
   const { effectiveDefaultTemplate } = await fresh('../dist/core/templates.js');
   assert.equal(effectiveDefaultTemplate(), 'compact');
-  delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
+  delete process.env.JOBOPS_DEFAULT_TEMPLATE;
 });
 
 test('effectiveDefaultTemplate falls back to "default" when configured value is missing', async () => {
-  process.env.MCP_JSA_DEFAULT_TEMPLATE = 'no-such-theme';
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
+  process.env.JOBOPS_DEFAULT_TEMPLATE = 'no-such-theme';
+  delete process.env.JOBOPS_TEMPLATE_DIR;
   // We expect a stderr warning but no throw — the function must return "default".
   const origErr = process.stderr.write.bind(process.stderr);
   const warnings = [];
@@ -354,8 +354,8 @@ test('effectiveDefaultTemplate falls back to "default" when configured value is 
     assert.equal(effectiveDefaultTemplate(), 'default');
   } finally {
     process.stderr.write = origErr;
-    delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
+    delete process.env.JOBOPS_DEFAULT_TEMPLATE;
   }
-  assert.ok(warnings.some(w => /MCP_JSA_DEFAULT_TEMPLATE/.test(w)),
+  assert.ok(warnings.some(w => /JOBOPS_DEFAULT_TEMPLATE/.test(w)),
     'a warning is printed to stderr when the configured default is missing');
 });

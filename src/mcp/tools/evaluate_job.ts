@@ -128,7 +128,7 @@ export const evaluateJobTool = defineTool({
     if (!picked) {
       return errResult(
         'mode="api" needs a scoring backend: connect an MCP client that supports sampling ' +
-        '(no key needed), or set MCP_JSA_LLM_PROVIDER=gemini with GEMINI_API_KEY. ' +
+        '(no key needed), or set JOBOPS_LLM_PROVIDER=gemini with GEMINI_API_KEY. ' +
         'Otherwise use mode="chat" (the default) — your chat client scores it.',
       );
     }

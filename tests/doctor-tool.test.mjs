@@ -65,9 +65,9 @@ tracked_companies:
 let sandbox;
 before(async () => {
   sandbox = mkdtempSync(join(tmpdir(), 'jobops-doctor-'));
-  process.env.MCP_JSA_DATA_DIR     = sandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = sandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_DATA_DIR     = sandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = sandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
   mkdirSync(join(sandbox, 'config'), { recursive: true });
   writeFileSync(join(sandbox, 'cv.md'), CV_MD, 'utf-8');
   writeFileSync(join(sandbox, 'config', 'profile.yml'), PROFILE_YML, 'utf-8');

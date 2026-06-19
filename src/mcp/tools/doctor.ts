@@ -9,7 +9,7 @@ export const doctorTool = defineTool({
   name: 'doctor',
   title: 'Server health check (read-only)',
   description:
-    'Read-only diagnostics for the running job_ops-mcp server. Returns a structured report: '
+    'Read-only diagnostics for the running jobops server. Returns a structured report: '
     + 'server identity (pid, uptime, transport, DB path + fingerprint, MCP clients seen — '
     + 'verifies all your clients share this one instance + DB), career_packet ↔ cv.md sync '
     + 'state (incl. chat-edited / cv-edited-after-reseed), LLM provider + key, MCP sampling '

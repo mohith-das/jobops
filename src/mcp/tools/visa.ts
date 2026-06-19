@@ -82,7 +82,7 @@ export const importLinkedinTool = defineTool({
         const cap = createCapture({ label: 'Absolute path to your LinkedIn Connections.csv', field: 'path' });
         try {
           const r = await ctx.bridge.elicitUrl({
-            message: 'Open this link on the machine running job_ops-mcp and enter the absolute path to your '
+            message: 'Open this link on the machine running jobops and enter the absolute path to your '
                    + 'LinkedIn Connections.csv. The path goes straight to your local server, not through this chat.',
             url: cap.url,
           });

@@ -1,6 +1,6 @@
 // HTTP transport for providers (ported from career-ops/providers/_http.mjs).
 const DEFAULT_TIMEOUT_MS = 12_000;
-const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; mcp-jsa/0.2)';
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; jobops/0.2)';
 
 export async function fetchWithTimeout(url: string, opts: any = {}): Promise<Response> {
   const controller = new AbortController();

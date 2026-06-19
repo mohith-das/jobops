@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// job_ops-mcp CLI entry point. Subcommands:
+// jobops CLI entry point. Subcommands:
 //   init    — scaffold cv.md / config/profile.yml / portals.yml from the .example files,
 //             run migrations, prompt for project root. Idempotent (never overwrites).
 //   start   — boot MCP + HTTP server. Auto-installs Chromium on first run.
@@ -53,13 +53,13 @@ const warn  = () => COLOR ? c.yellow('!') : 'WARN ';
 
 async function cmdInit(flags: Map<string, string | boolean>) {
   const yes = !!flags.get('yes');
-  console.log(c.bold(`\njob_ops-mcp init`));
+  console.log(c.bold(`\njobops init`));
   console.log(c.dim(`package: ${PKG.name}@${PKG.version}`));
   console.log(c.dim(`install root: ${PACKAGE_ROOT}\n`));
 
   const cwd = process.cwd();
   console.log(`Project root: ${c.bold(cwd)}`);
-  console.log(c.dim('(This is where cv.md, config/profile.yml, portals.yml will live. You can move them later — point the server at the new location with MCP_JSA_PROJECT_ROOT.)\n'));
+  console.log(c.dim('(This is where cv.md, config/profile.yml, portals.yml will live. You can move them later — point the server at the new location with JOBOPS_PROJECT_ROOT.)\n'));
 
   const examples: Array<{ src: string; dst: string; label: string }> = [
     { src: 'cv.example.md',                dst: 'cv.md',                  label: 'CV (markdown)' },
@@ -107,9 +107,9 @@ async function cmdInit(flags: Map<string, string | boolean>) {
   }
 
   // Run migrations by importing db.ts — getDb() applies pending migrations on first open.
-  // Set MCP_JSA_PROJECT_ROOT to cwd BEFORE config.ts gets imported so the data dir lives
+  // Set JOBOPS_PROJECT_ROOT to cwd BEFORE config.ts gets imported so the data dir lives
   // next to the user's cv.md / profile.yml, not inside the package install.
-  process.env.MCP_JSA_PROJECT_ROOT = process.env.MCP_JSA_PROJECT_ROOT || cwd;
+  process.env.JOBOPS_PROJECT_ROOT = process.env.JOBOPS_PROJECT_ROOT || cwd;
   try {
     const { config: cfg } = await import('./config.js');
     const { getDb } = await import('./db.js');
@@ -134,9 +134,9 @@ async function cmdInit(flags: Map<string, string | boolean>) {
     } else if (status === 'packet_chat_edited') {
       console.log(`  ${tick()} active packet is chat-edited (ahead of cv.md) — left intact. ${c.dim('reseed will not overwrite it without --force.')}`);
     } else if (status === 'cv_is_example') {
-      console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx job_ops-mcp reseed')}.`);
+      console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx jobops reseed')}.`);
     } else if (status === 'packet_is_template') {
-      console.log(`  ${warn()} active packet still has TODO markers. Run ${c.bold('npx job_ops-mcp reseed')} to rebuild from cv.md.`);
+      console.log(`  ${warn()} active packet still has TODO markers. Run ${c.bold('npx jobops reseed')} to rebuild from cv.md.`);
     }
   } catch (e: any) {
     console.log(`  ${cross()} migration error: ${e?.message ?? e}`);
@@ -146,9 +146,9 @@ async function cmdInit(flags: Map<string, string | boolean>) {
   console.log(c.bold('\nNext steps:'));
   console.log(`  1. Edit ${c.bold('cv.md')}, ${c.bold('config/profile.yml')}, and ${c.bold('portals.yml')} — replace every <TODO> placeholder.`);
   console.log(`     ${c.dim('Optional: tune the behavior in modes/*.md (rubric, tailoring rules, outreach tone) — your edits win over the bundled defaults.')}`);
-  console.log(`  2. Run ${c.bold('npx job_ops-mcp doctor')} to confirm everything is wired.`);
-  console.log(`  3. Run ${c.bold('npx job_ops-mcp start')} to boot the server.`);
-  console.log(`  4. Run ${c.bold('npx job_ops-mcp connect')} for Claude Desktop config.\n`);
+  console.log(`  2. Run ${c.bold('npx jobops doctor')} to confirm everything is wired.`);
+  console.log(`  3. Run ${c.bold('npx jobops start')} to boot the server.`);
+  console.log(`  4. Run ${c.bold('npx jobops connect')} for Claude Desktop config.\n`);
 
   if (scaffolded === 0 && kept > 0) {
     console.log(c.dim('(All example files already present; init is idempotent — re-run safe.)'));
@@ -160,7 +160,7 @@ async function cmdInit(flags: Map<string, string | boolean>) {
 
 async function cmdStart(flags: Map<string, string | boolean>) {
   // Default project root = cwd, so users who ran `init` get their files picked up.
-  if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
+  if (!process.env.JOBOPS_PROJECT_ROOT) process.env.JOBOPS_PROJECT_ROOT = process.cwd();
   const stdio = !!flags.get('stdio');
   const skipBrowserCheck = !!flags.get('skip-chromium-check');
   // In stdio mode we MUST keep stdout clean — `npx playwright install` writes
@@ -192,7 +192,7 @@ async function ensureChromium(): Promise<void> {
 // ── doctor ──────────────────────────────────────────────────────────────────
 
 async function cmdDoctor() {
-  console.log(c.bold(`\njob_ops-mcp doctor\n`));
+  console.log(c.bold(`\njobops doctor\n`));
   const { runDoctorChecks } = await import('./core/doctor.js');
   const report = await runDoctorChecks({ context: 'cold' });
 
@@ -213,11 +213,11 @@ async function cmdDoctor() {
 // ── connect ─────────────────────────────────────────────────────────────────
 
 async function cmdConnect(flags: Map<string, string | boolean>) {
-  // When MCP_JSA_PUBLIC_BASE_URL is set (remote host / Tailscale), use it for every
+  // When JOBOPS_PUBLIC_BASE_URL is set (remote host / Tailscale), use it for every
   // config block so the URL the user pastes actually reaches the server from other
   // devices. Falls back to host:port for local use.
-  const port = String(flags.get('port') ?? process.env.MCP_JSA_PORT ?? '7891');
-  const host = String(flags.get('host') ?? process.env.MCP_JSA_HOST ?? '127.0.0.1');
+  const port = String(flags.get('port') ?? process.env.JOBOPS_PORT ?? '7891');
+  const host = String(flags.get('host') ?? process.env.JOBOPS_HOST ?? '127.0.0.1');
   const { config: cfg } = await import('./config.js');
   const url = cfg.publicBaseUrlIsExplicit ? `${cfg.publicBaseUrl}/mcp` : `http://${host}:${port}/mcp`;
   const token = (typeof flags.get('token') === 'string' ? String(flags.get('token')) : cfg.authToken) || null;
@@ -229,9 +229,9 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
   const dockerHost = 'host.docker.internal';
   const dockerUrl  = `http://${dockerHost}:${port}/mcp`;
 
-  console.log(c.bold(`\njob_ops-mcp connect — one server, every client\n`));
+  console.log(c.bold(`\njobops connect — one server, every client\n`));
   console.log(`Recommended topology: ${c.bold('ONE long-running server = ONE source of truth.')}`);
-  console.log(`  Start it once:           ${c.bold('npx job_ops-mcp start')}   ${c.dim('(HTTP mode — serves many concurrent clients)')}`);
+  console.log(`  Start it once:           ${c.bold('npx jobops start')}   ${c.dim('(HTTP mode — serves many concurrent clients)')}`);
   console.log(`  Every client connects to: ${c.bold(url)}`);
   console.log(c.dim(
     '  Work done in ANY client (materials, tracker, contacts, packet edits) is instantly\n' +
@@ -239,29 +239,29 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     '  without losing state. Run it locally, or on an always-on host over Tailscale.\n'));
 
   if (token) {
-    console.log(`Auth: ${c.bold('MCP_JSA_AUTH_TOKEN is set')} — the configs below include the bearer token.`);
+    console.log(`Auth: ${c.bold('JOBOPS_AUTH_TOKEN is set')} — the configs below include the bearer token.`);
   } else if (isLocal) {
     console.log(`Auth: localhost, no token — fine for same-machine clients.`);
     console.log(c.dim(
       '  Sharing the server beyond localhost (Tailscale / LAN / always-on host)? You MUST set\n' +
-      '  MCP_JSA_AUTH_TOKEN — the server refuses to boot on a non-localhost bind without it,\n' +
+      '  JOBOPS_AUTH_TOKEN — the server refuses to boot on a non-localhost bind without it,\n' +
       '  because it serves PII (resume, contacts, H1B data) to every connected endpoint.\n' +
-      '  Generate one:  export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"\n' +
+      '  Generate one:  export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"\n' +
       '  then re-run `connect` — every config below will include it.'));
   } else {
     console.log(c.yellow(
       'Auth: non-localhost endpoint with NO token in this shell — the server will not boot\n' +
-      'like this. Set MCP_JSA_AUTH_TOKEN (export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)")\n' +
+      'like this. Set JOBOPS_AUTH_TOKEN (export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)")\n' +
       'and re-run `connect` so the configs include it.'));
   }
 
   // ── Claude Code ────────────────────────────────────────────────────────────
   console.log(c.bold('\n── Claude Code ──'));
   const ccHeader = token ? ` --header "Authorization: Bearer ${token}"` : '';
-  console.log(`One command:\n  ${c.bold(`claude mcp add --transport http job_ops-mcp ${url}${ccHeader}`)}`);
+  console.log(`One command:\n  ${c.bold(`claude mcp add --transport http jobops ${url}${ccHeader}`)}`);
   console.log(c.dim('Or per-project .mcp.json (commit-able; --scope project writes this):'));
   console.log(JSON.stringify({
-    mcpServers: { 'job_ops-mcp': { type: 'http', url, ...(authHeaders ? { headers: authHeaders } : {}) } },
+    mcpServers: { 'jobops': { type: 'http', url, ...(authHeaders ? { headers: authHeaders } : {}) } },
   }, null, 2));
 
   // ── Claude Desktop (shared server) ─────────────────────────────────────────
@@ -280,7 +280,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     'Node 24 binary and point args at a Node-24-installed mcp-remote.\n'));
   console.log(JSON.stringify({
     mcpServers: {
-      'job_ops-mcp': {
+      'jobops': {
         command: 'npx',
         args: ['-y', 'mcp-remote', url, ...(token ? ['--header', `Authorization: Bearer ${token}`] : [])],
       },
@@ -292,28 +292,28 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
   console.log(JSON.stringify({
     $schema: 'https://opencode.ai/config.json',
     mcp: {
-      'job_ops-mcp': { type: 'remote', url, enabled: true, ...(authHeaders ? { headers: authHeaders } : {}) },
+      'jobops': { type: 'remote', url, enabled: true, ...(authHeaders ? { headers: authHeaders } : {}) },
     },
   }, null, 2));
 
   // ── codex ──────────────────────────────────────────────────────────────────
   console.log(c.bold('\n── codex — ~/.codex/config.toml ──'));
   console.log(c.dim(token
-    ? 'codex reads the bearer token from an env var (bearer_token_env_var) — keep MCP_JSA_AUTH_TOKEN exported in the shell that launches codex.'
-    : 'No token set — add bearer_token_env_var = "MCP_JSA_AUTH_TOKEN" when you enable auth.'));
+    ? 'codex reads the bearer token from an env var (bearer_token_env_var) — keep JOBOPS_AUTH_TOKEN exported in the shell that launches codex.'
+    : 'No token set — add bearer_token_env_var = "JOBOPS_AUTH_TOKEN" when you enable auth.'));
   console.log([
-    `[mcp_servers.job_ops_mcp]`,
+    `[mcp_servers.jobops]`,
     `url = "${url}"`,
-    ...(token ? [`bearer_token_env_var = "MCP_JSA_AUTH_TOKEN"`] : []),
+    ...(token ? [`bearer_token_env_var = "JOBOPS_AUTH_TOKEN"`] : []),
   ].join('\n'));
   console.log(c.dim('Older codex builds without streamable-HTTP support can bridge instead\n' +
     '(same mcp-remote Node <= 24 caveat as the Claude Desktop section):\n' +
-    `  [mcp_servers.job_ops_mcp]\n  command = "npx"\n  args = ["-y", "mcp-remote", "${url}"${token ? `, "--header", "Authorization: Bearer ${token}"` : ''}]`));
+    `  [mcp_servers.jobops]\n  command = "npx"\n  args = ["-y", "mcp-remote", "${url}"${token ? `, "--header", "Authorization: Bearer ${token}"` : ''}]`));
 
   // ── gemini-cli ─────────────────────────────────────────────────────────────
   console.log(c.bold('\n── gemini-cli — ~/.gemini/settings.json (or .gemini/settings.json per project) ──'));
   console.log(JSON.stringify({
-    mcpServers: { 'job_ops-mcp': { httpUrl: url, ...(authHeaders ? { headers: authHeaders } : {}) } },
+    mcpServers: { 'jobops': { httpUrl: url, ...(authHeaders ? { headers: authHeaders } : {}) } },
   }, null, 2));
 
   // ── LibreChat ──────────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
   console.log(c.dim('Add under top-level `mcpServers:` in your librechat.yaml, then restart LibreChat.\n'));
   console.log(yamlBlock({
     mcpServers: {
-      'job_ops-mcp': {
+      'jobops': {
         type:    'streamable-http',
         url,
         timeout: 60000,
@@ -342,7 +342,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
   ));
   console.log(yamlBlock({
     mcpServers: {
-      'job_ops-mcp': {
+      'jobops': {
         type:    'streamable-http',
         url:     dockerUrl,
         timeout: 60000,
@@ -364,7 +364,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
   // ── Generic ────────────────────────────────────────────────────────────────
   console.log(c.bold('\n── Any other MCP client (streamable-HTTP, stateless) ──'));
   console.log(JSON.stringify({
-    name:      'job_ops-mcp',
+    name:      'jobops',
     transport: 'streamable-http',
     url,
     ...(authHeaders ? { headers: authHeaders } : {}),
@@ -377,23 +377,23 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     'one. Tradeoffs: (a) state is only shared with other clients if they point at the same\n' +
     'project root / DB file — and even then they are separate processes; (b) a shared HTTP\n' +
     'server already running on the same port causes EADDRINUSE — give a stdio instance its\n' +
-    'own MCP_JSA_PORT. Prefer the mcp-remote bridge above for shared mode. Claude Desktop\n' +
+    'own JOBOPS_PORT. Prefer the mcp-remote bridge above for shared mode. Claude Desktop\n' +
     'stdio config (claude_desktop_config.json):\n'));
   console.log(JSON.stringify({
     mcpServers: {
-      'job_ops-mcp': {
+      'jobops': {
         command: 'npx',
         args:    ['-y', PKG.name, 'start', '--stdio'],
         env: {
-          MCP_JSA_PORT: port,
-          MCP_JSA_HOST: host,
-          MCP_JSA_PROJECT_ROOT: process.cwd(),
+          JOBOPS_PORT: port,
+          JOBOPS_HOST: host,
+          JOBOPS_PROJECT_ROOT: process.cwd(),
         },
       },
     },
   }, null, 2));
 
-  console.log(c.dim(`\nVerify any client is hitting the shared instance:  npx job_ops-mcp status${token ? ' --token <token>' : ''}\n`));
+  console.log(c.dim(`\nVerify any client is hitting the shared instance:  npx jobops status${token ? ' --token <token>' : ''}\n`));
 }
 
 // ── status ──────────────────────────────────────────────────────────────────
@@ -407,7 +407,7 @@ async function cmdStatus(flags: Map<string, string | boolean>) {
   const flagToken = flags.get('token');
   const token = (typeof flagToken === 'string' ? flagToken : cfg.authToken) || null;
 
-  console.log(c.bold(`\njob_ops-mcp status — ${base}\n`));
+  console.log(c.bold(`\njobops status — ${base}\n`));
 
   let health: any;
   try {
@@ -415,8 +415,8 @@ async function cmdStatus(flags: Map<string, string | boolean>) {
     health = await r.json();
   } catch (e: any) {
     console.log(`${cross()} No server reachable at ${base} (${e?.cause?.code ?? e?.message ?? e})`);
-    console.log(c.dim('   Start the shared server with:  npx job_ops-mcp start'));
-    console.log(c.dim('   Or point this check elsewhere: npx job_ops-mcp status --url http://host:7891\n'));
+    console.log(c.dim('   Start the shared server with:  npx jobops start'));
+    console.log(c.dim('   Or point this check elsewhere: npx jobops status --url http://host:7891\n'));
     process.exit(1);
   }
   console.log(`${tick()} Server reachable (auth: ${health.auth})`);
@@ -425,11 +425,11 @@ async function cmdStatus(flags: Map<string, string | boolean>) {
   const r = await fetch(`${base}/api/status`, { headers });
   if (r.status === 401) {
     console.log(`${cross()} /api/status requires the bearer token (server runs with auth enabled).`);
-    console.log(c.dim('   Pass it:  npx job_ops-mcp status --token <token>   (or export MCP_JSA_AUTH_TOKEN)\n'));
+    console.log(c.dim('   Pass it:  npx jobops status --token <token>   (or export JOBOPS_AUTH_TOKEN)\n'));
     process.exit(1);
   }
   if (!r.ok) {
-    console.log(`${cross()} /api/status returned HTTP ${r.status} — is this an older job_ops-mcp (< 0.13)?\n`);
+    console.log(`${cross()} /api/status returned HTTP ${r.status} — is this an older jobops (< 0.13)?\n`);
     process.exit(1);
   }
   const s = await r.json();
@@ -490,8 +490,8 @@ function yamlBlock(o: unknown, indent = 0): string {
 // ── templates ───────────────────────────────────────────────────────────────
 
 async function cmdTemplates() {
-  if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
-  console.log(c.bold('\njob_ops-mcp templates\n'));
+  if (!process.env.JOBOPS_PROJECT_ROOT) process.env.JOBOPS_PROJECT_ROOT = process.cwd();
+  console.log(c.bold('\njobops templates\n'));
   const { config: cfg } = await import('./config.js');
   const { listThemes, effectiveDefaultTemplate } = await import('./core/templates.js');
 
@@ -499,9 +499,9 @@ async function cmdTemplates() {
   const def     = effectiveDefaultTemplate();
   const userDir = cfg.userTemplateDir;
 
-  console.log(c.dim(`default theme: ${c.bold(def)}  ${process.env.MCP_JSA_DEFAULT_TEMPLATE ? '(from MCP_JSA_DEFAULT_TEMPLATE)' : '(built-in default)'}`));
+  console.log(c.dim(`default theme: ${c.bold(def)}  ${process.env.JOBOPS_DEFAULT_TEMPLATE ? '(from JOBOPS_DEFAULT_TEMPLATE)' : '(built-in default)'}`));
   console.log(c.dim(`bundled themes dir: ${cfg.installDir}/templates/themes`));
-  console.log(c.dim(`user themes dir:    ${userDir ?? '(unset — set MCP_JSA_TEMPLATE_DIR to add custom themes)'}\n`));
+  console.log(c.dim(`user themes dir:    ${userDir ?? '(unset — set JOBOPS_TEMPLATE_DIR to add custom themes)'}\n`));
 
   if (themes.length === 0) {
     console.log(c.red('No themes found.'));
@@ -526,7 +526,7 @@ async function cmdTemplates() {
       console.log(c.dim(`Note: user theme(s) ${shadows.join(', ')} would shadow a bundled theme of the same name. Listed once above with [user].\n`));
     }
   }
-  console.log(c.dim(`Use a theme: pass template="<name>" to render_pdf, or set MCP_JSA_DEFAULT_TEMPLATE.`));
+  console.log(c.dim(`Use a theme: pass template="<name>" to render_pdf, or set JOBOPS_DEFAULT_TEMPLATE.`));
   console.log(c.dim(`Author a new theme: see TEMPLATES.md (placeholder contract).`));
   console.log('');
 }
@@ -534,8 +534,8 @@ async function cmdTemplates() {
 // ── reseed ──────────────────────────────────────────────────────────────────
 
 async function cmdReseed(flags: Map<string, string | boolean>) {
-  if (!process.env.MCP_JSA_PROJECT_ROOT) process.env.MCP_JSA_PROJECT_ROOT = process.cwd();
-  console.log(c.bold('\njob_ops-mcp reseed\n'));
+  if (!process.env.JOBOPS_PROJECT_ROOT) process.env.JOBOPS_PROJECT_ROOT = process.cwd();
+  console.log(c.bold('\njobops reseed\n'));
   console.log(c.dim('Rebuilds the active career_packet from the current cv.md + config/profile.yml.'));
   console.log(c.dim('Bumps version; the previous active row is demoted (history kept).\n'));
 
@@ -543,7 +543,7 @@ async function cmdReseed(flags: Map<string, string | boolean>) {
   const { cvMd, profile } = loadProjectFiles();
 
   if (!profile && !flags.get('force')) {
-    console.error(`  ${cross()} config/profile.yml not found. Run ${c.bold('npx job_ops-mcp init')} first, or pass --force.`);
+    console.error(`  ${cross()} config/profile.yml not found. Run ${c.bold('npx jobops init')} first, or pass --force.`);
     process.exit(1);
   }
   if (!cvHasRealContent(cvMd) && !flags.get('force')) {
@@ -577,10 +577,10 @@ async function cmdReseed(flags: Map<string, string | boolean>) {
 
 function cmdHelp() {
   console.log(`
-${c.bold('job_ops-mcp')} — self-hosted MCP server for an end-to-end job search pipeline.
+${c.bold('jobops')} — self-hosted MCP server for an end-to-end job search pipeline.
 
 USAGE
-  npx job_ops-mcp <command> [flags]
+  npx jobops <command> [flags]
 
 COMMANDS
   init              Scaffold cv.md / config/profile.yml / portals.yml from examples
@@ -601,25 +601,31 @@ COMMANDS
   help              Show this message.
 
 ENV
-  MCP_JSA_PORT                 default 7891
-  MCP_JSA_HOST                 default 127.0.0.1
-  MCP_JSA_PROJECT_ROOT         where cv.md / config/profile.yml / portals.yml live
+  JOBOPS_PORT                 default 7891
+  JOBOPS_HOST                 default 127.0.0.1
+  JOBOPS_PROJECT_ROOT         where cv.md / config/profile.yml / portals.yml live
                                default: current working dir
-  MCP_JSA_DATA_DIR             SQLite location; default <install>/data
-  MCP_JSA_VISA_SCORING         true | false (default true) — disables visa surface entirely
-  MCP_JSA_TEMPLATE_DIR         user-owned dir holding additional themes (overrides bundled)
-  MCP_JSA_DEFAULT_TEMPLATE     theme name when render_pdf has no template arg (default "default")
-  MCP_JSA_LLM_PROVIDER         gemini | deepseek | none  (api/batch tools only)
+  JOBOPS_DATA_DIR             SQLite location; default <install>/data
+  JOBOPS_VISA_SCORING         true | false (default true) — disables visa surface entirely
+  JOBOPS_TEMPLATE_DIR         user-owned dir holding additional themes (overrides bundled)
+  JOBOPS_DEFAULT_TEMPLATE     theme name when render_pdf has no template arg (default "default")
+  JOBOPS_LLM_PROVIDER         gemini | deepseek | none  (api/batch tools only)
   GEMINI_API_KEY / DEEPSEEK_API_KEY
 
 LEARN MORE
-  README: ${PKG.homepage || 'https://github.com/<you>/job_ops-mcp'}
+  README: ${PKG.homepage || 'https://github.com/<you>/jobops'}
 `);
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Map legacy MCP_JSA_* env vars onto JOBOPS_* before any subcommand reads them.
+  // (config.ts does this too, but several subcommands read process.env directly
+  // without importing config — so do it here at the entry point as well.)
+  const { applyLegacyEnvAliases } = await import('./core/legacy_env.js');
+  applyLegacyEnvAliases();
+
   const { cmd, flags } = parseArgs(process.argv);
   try {
     switch (cmd) {

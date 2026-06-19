@@ -64,7 +64,7 @@ export const renderPdfTool = defineTool({
     cover_body:  z.string().optional().describe('Plain-prose cover letter body (required when kind includes cover). 250-350 words.'),
     page_format: z.enum(['a4', 'letter']).default('letter'),
     template:    z.string().optional()
-                  .describe('Named theme (see `job_ops-mcp templates`). Searches MCP_JSA_TEMPLATE_DIR then bundled themes. Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". Affects .tex and .pdf only — .docx is procedurally generated.'),
+                  .describe('Named theme (see `jobops templates`). Searches JOBOPS_TEMPLATE_DIR then bundled themes. Defaults to JOBOPS_DEFAULT_TEMPLATE or "default". Affects .tex and .pdf only — .docx is procedurally generated.'),
   },
   handler: async (args) => {
     try {

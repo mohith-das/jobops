@@ -1,4 +1,4 @@
--- mcp-jsa initial schema.
+-- jobops initial schema.
 -- Collapses the JSA Postgres schema (study guide §3) + career-ops side-tables (eval_reports,
 -- story_bank, negotiation_notes) into a single SQLite file. Shapes match JSA columns so SQL
 -- recipes from the study guide (§10, §12.9) port over with minimal edits.

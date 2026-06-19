@@ -13,7 +13,7 @@
 // rubric.md gets a small dynamic prefix when `visaScoringEnabled` is false — that single
 // injection point ensures every consumer of the rubric (chat-mode evaluate_job step 1,
 // api-mode evaluate_job, batch_evaluate, evaluate_training, evaluate_project, the
-// `mcp-jsa://modes/rubric` MCP resource) sees the override identically.
+// `jobops://modes/rubric` MCP resource) sees the override identically.
 
 import { readFileSync, existsSync, watch as fsWatch } from 'node:fs';
 import { resolve } from 'node:path';
@@ -55,7 +55,7 @@ function ensureWatcher(): void {
 
 const VISA_DISABLED_PREFIX = `# ⚙️ VISA SCORING DISABLED (server config)
 
-The candidate has disabled visa scoring (\`MCP_JSA_VISA_SCORING=false\`). For this run:
+The candidate has disabled visa scoring (\`JOBOPS_VISA_SCORING=false\`). For this run:
 
 - **DO NOT** include \`visa_fit\` in the output JSON.
 - Use the renormalized formula:

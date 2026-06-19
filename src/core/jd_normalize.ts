@@ -10,7 +10,7 @@
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_JD_CHARS     = 18_000;
-const USER_AGENT       = 'Mozilla/5.0 (compatible; mcp-jsa/0.1)';
+const USER_AGENT       = 'Mozilla/5.0 (compatible; jobops/0.1)';
 
 /**
  * Best-effort extraction of the company name from a known ATS URL. Returns a

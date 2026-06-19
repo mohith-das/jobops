@@ -22,9 +22,9 @@ before(async () => {
   // Write a user-edited rubric BEFORE config.ts is first imported so userModesDir resolves here.
   mkdirSync(join(loaderSandbox, 'modes'), { recursive: true });
   writeFileSync(join(loaderSandbox, 'modes', 'rubric.md'), '# USER-EDITED RUBRIC\nfizzbuzz marker\n', 'utf-8');
-  process.env.MCP_JSA_DATA_DIR     = loaderSandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = loaderSandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = loaderSandbox;
+  process.env.JOBOPS_DATA_DIR     = loaderSandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = loaderSandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = loaderSandbox;
 });
 
 after(() => {
@@ -55,7 +55,7 @@ const MODE_FILES = [
 function runInit(cwd) {
   return spawnSync(process.execPath, [CLI, 'init'], {
     cwd,
-    env: { ...process.env, MCP_JSA_PROJECT_ROOT: cwd, MCP_JSA_DATA_DIR: join(cwd, 'data') },
+    env: { ...process.env, JOBOPS_PROJECT_ROOT: cwd, JOBOPS_DATA_DIR: join(cwd, 'data') },
     encoding: 'utf-8',
   });
 }

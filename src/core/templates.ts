@@ -4,11 +4,11 @@
 //   resume.tex, cover.tex, resume.html, cover.html
 //
 // Search order, highest priority first:
-//   1. <userTemplateDir>/<name>/                   — MCP_JSA_TEMPLATE_DIR
+//   1. <userTemplateDir>/<name>/                   — JOBOPS_TEMPLATE_DIR
 //   2. <installDir>/templates/themes/<name>/       — bundled with the package
 //
 // A user can override "default" by dropping their own `default/` folder into
-// MCP_JSA_TEMPLATE_DIR. A user can also add brand-new themes that only live in
+// JOBOPS_TEMPLATE_DIR. A user can also add brand-new themes that only live in
 // their dir. Per-call `template=<name>` argument picks which theme to render.
 //
 // Each theme file is a plain-text template with {{PLACEHOLDER}} slots; the
@@ -56,20 +56,20 @@ export interface ResolvedTemplate {
 const BUNDLED_THEMES_DIR = () => resolve(config.installDir, 'templates', 'themes');
 
 /**
- * Read MCP_JSA_TEMPLATE_DIR live from process.env so tests + tools that flip
+ * Read JOBOPS_TEMPLATE_DIR live from process.env so tests + tools that flip
  * the env var in-process see the change immediately. The config singleton
  * caches the boot-time value for display purposes (doctor, connect); this
  * function is the source of truth for the loader.
  */
 const USER_THEMES_DIR = (): string | null => {
-  const raw = process.env.MCP_JSA_TEMPLATE_DIR?.trim();
+  const raw = process.env.JOBOPS_TEMPLATE_DIR?.trim();
   if (!raw) return null;
   return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
 };
 
-/** Live read of MCP_JSA_DEFAULT_TEMPLATE (see comment on USER_THEMES_DIR). */
+/** Live read of JOBOPS_DEFAULT_TEMPLATE (see comment on USER_THEMES_DIR). */
 const DEFAULT_TEMPLATE_NAME = (): string => {
-  const raw = process.env.MCP_JSA_DEFAULT_TEMPLATE?.trim();
+  const raw = process.env.JOBOPS_DEFAULT_TEMPLATE?.trim();
   return raw || 'default';
 };
 
@@ -115,7 +115,7 @@ export function resolveTheme(name: string): ThemeInfo {
   const available = listThemes().map(t => t.name).join(', ') || '(none)';
   const hint = userDir
     ? `Searched ${userDir}/${name}/ and ${BUNDLED_THEMES_DIR()}/${name}/`
-    : `Searched ${BUNDLED_THEMES_DIR()}/${name}/ (set MCP_JSA_TEMPLATE_DIR to add a user themes dir)`;
+    : `Searched ${BUNDLED_THEMES_DIR()}/${name}/ (set JOBOPS_TEMPLATE_DIR to add a user themes dir)`;
   throw new Error(`Unknown template theme "${name}". Available: ${available}. ${hint}`);
 }
 
@@ -182,7 +182,7 @@ function inLatexComment(body: string, offset: number): boolean {
 }
 
 /**
- * Resolve the effective default theme: MCP_JSA_DEFAULT_TEMPLATE if set, else
+ * Resolve the effective default theme: JOBOPS_DEFAULT_TEMPLATE if set, else
  * "default". Falls back to "default" with a stderr warning if the configured
  * default is missing — never crashes the renderer at boot.
  */
@@ -192,7 +192,7 @@ export function effectiveDefaultTemplate(): string {
   catch (err: any) {
     if (configured !== 'default') {
       // eslint-disable-next-line no-console
-      console.error(`[templates] WARN: MCP_JSA_DEFAULT_TEMPLATE="${configured}" not found — falling back to "default". ${err?.message ?? ''}`);
+      console.error(`[templates] WARN: JOBOPS_DEFAULT_TEMPLATE="${configured}" not found — falling back to "default". ${err?.message ?? ''}`);
     }
     return 'default';
   }

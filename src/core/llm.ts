@@ -1,6 +1,6 @@
 // Pluggable LLM module.
 //
-// Provider picked by env (`MCP_JSA_LLM_PROVIDER`):
+// Provider picked by env (`JOBOPS_LLM_PROVIDER`):
 //   - gemini   → Google AI Studio free tier (default). `GEMINI_API_KEY` required.
 //   - deepseek → DeepSeek chat API (OpenAI-compatible). `DEEPSEEK_API_KEY` required.
 //   - none     → throws on call. Default behaviour when neither key is set.
@@ -148,7 +148,7 @@ class NoneProvider implements LLMProvider {
   defaultModel = 'none';
   async chat(): Promise<LLMResult> {
     throw new Error(
-      'No LLM provider configured. Set MCP_JSA_LLM_PROVIDER=gemini (with GEMINI_API_KEY) ' +
+      'No LLM provider configured. Set JOBOPS_LLM_PROVIDER=gemini (with GEMINI_API_KEY) ' +
       'or =deepseek (with DEEPSEEK_API_KEY). The default chat-mode tools do not need this — ' +
       'only api/batch paths do.',
     );

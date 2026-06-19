@@ -44,9 +44,9 @@ const note = (status, name, detail = '') => {
 };
 
 mkdirSync(SBOX, { recursive: true });
-process.env.MCP_JSA_PROJECT_ROOT = SBOX;
-process.env.MCP_JSA_DATA_DIR     = resolve(SBOX, 'data');
-process.env.MCP_JSA_OUTPUT_DIR   = resolve(SBOX, 'output');
+process.env.JOBOPS_PROJECT_ROOT = SBOX;
+process.env.JOBOPS_DATA_DIR     = resolve(SBOX, 'data');
+process.env.JOBOPS_OUTPUT_DIR   = resolve(SBOX, 'output');
 console.log(`Sandbox: ${SBOX}`);
 
 // ── Short CV — ordinary case ───────────────────────────────────────────────
@@ -258,8 +258,8 @@ async function runScenario(s) {
 
   // When the scenario uses a custom theme, expose the user themes dir to the
   // loader. Otherwise unset so the bundled default is in play.
-  if (s.theme) process.env.MCP_JSA_TEMPLATE_DIR = USER_THEMES;
-  else delete process.env.MCP_JSA_TEMPLATE_DIR;
+  if (s.theme) process.env.JOBOPS_TEMPLATE_DIR = USER_THEMES;
+  else delete process.env.JOBOPS_TEMPLATE_DIR;
 
   // Reset DB modules so a stale connection doesn't point at the previous DB instance.
   // Also clear the cached active-packet so the new cv.md drives parseCV().
@@ -285,7 +285,7 @@ async function runScenario(s) {
   if (!s.skipPdf) {
     const pdfFiles = await renderPdf({ job_id: jobId, kind: 'both', cover_body: s.cover, page_format: 'letter', theme: s.theme });
     for (const f of pdfFiles) {
-      const buf = readFileSync(resolve(process.env.MCP_JSA_OUTPUT_DIR, f.path));
+      const buf = readFileSync(resolve(process.env.JOBOPS_OUTPUT_DIR, f.path));
       const pages = pdfPageCount(buf);
       const max = f.kind === 'resume' ? s.maxResumePages : s.maxCoverPages;
       note(pages > 0 && pages <= max ? 'PASS' : 'FAIL',
@@ -297,7 +297,7 @@ async function runScenario(s) {
   // ── .tex ──────────────────────────────────────────────────────────────
   const texResume = buildResumeTex({ theme: s.theme });
   const texCover  = buildCoverTex({ body: s.cover, company: 'Pinch AI', location: 'Remote' }, { theme: s.theme });
-  const texDir = resolve(process.env.MCP_JSA_OUTPUT_DIR, 'tex');
+  const texDir = resolve(process.env.JOBOPS_OUTPUT_DIR, 'tex');
   mkdirSync(texDir, { recursive: true });
   const texResumePath = resolve(texDir, `resume-${s.name}.tex`);
   const texCoverPath  = resolve(texDir, `cover-${s.name}.tex`);
@@ -329,7 +329,7 @@ async function runScenario(s) {
 
   // ── .docx ─────────────────────────────────────────────────────────────
   if (s.skipDocx) return;
-  const docxDir = resolve(process.env.MCP_JSA_OUTPUT_DIR, 'docx');
+  const docxDir = resolve(process.env.JOBOPS_OUTPUT_DIR, 'docx');
   mkdirSync(docxDir, { recursive: true });
   const docxResume = resolve(docxDir, `resume-${s.name}.docx`);
   const docxCover  = resolve(docxDir, `cover-${s.name}.docx`);

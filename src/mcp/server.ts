@@ -79,7 +79,7 @@ import { applyPrefillTool } from './tools/apply_prefill.js';
 // G9 — scheduler
 import { schedulerStatusTool, schedulerEnableTool, schedulerDisableTool } from './tools/scheduler.js';
 
-// Tools tagged "visa" are hidden from tools/list when MCP_JSA_VISA_SCORING=false.
+// Tools tagged "visa" are hidden from tools/list when JOBOPS_VISA_SCORING=false.
 const VISA_TOOL_NAMES: ReadonlySet<string> = new Set([
   'visa_signal', 'import_h1b', 'import_linkedin',
 ]);
@@ -118,7 +118,7 @@ const PKG_VERSION = pkgVersion();
 // Tools and resources are static, but each protocol instance must be fresh — see the
 // multi-client note in the header. Registration is microseconds; correctness first.
 function buildMcpServer(): McpServer {
-  const server = new McpServer({ name: 'mcp-jsa', version: PKG_VERSION });
+  const server = new McpServer({ name: 'jobops', version: PKG_VERSION });
   registerTools(server, ALL_TOOLS);
   for (const r of listResources()) {
     server.registerResource(

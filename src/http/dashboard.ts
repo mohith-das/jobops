@@ -219,7 +219,7 @@ export function renderDashboard(raw: Record<string, unknown> = {}): string {
 
   const body = `
 <header>
-  <h1>mcp-jsa tracker</h1>
+  <h1>jobops tracker</h1>
   <span class="meta">${counts.total ?? 0} active · <a href="/trash">trash (${trashN})</a> · /files from output/</span>
 </header>
 <main>
@@ -276,7 +276,7 @@ export function renderDashboard(raw: Record<string, unknown> = {}): string {
     bumpTotal(-1); refreshCounts();
   });`;
 
-  return shell('mcp-jsa tracker', body, script);
+  return shell('jobops tracker', body, script);
 }
 
 // ── /trash page ─────────────────────────────────────────────────────────────--
@@ -298,7 +298,7 @@ export function renderTrashPage(): string {
 
   const body = `
 <header>
-  <h1><a href="/">mcp-jsa tracker</a> › trash</h1>
+  <h1><a href="/">jobops tracker</a> › trash</h1>
   <span class="meta"><a href="/">← back to tracker</a></span>
 </header>
 <main>
@@ -339,5 +339,5 @@ export function renderTrashPage(): string {
     }
   });`;
 
-  return shell('mcp-jsa trash', body, script);
+  return shell('jobops trash', body, script);
 }

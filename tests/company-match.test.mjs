@@ -67,9 +67,9 @@ test('normalize is the light touch (keeps suffixes, lowercases, collapses ws)', 
 let sandbox;
 before(async () => {
   sandbox = mkdtempSync(join(tmpdir(), 'jobops-company-match-'));
-  process.env.MCP_JSA_DATA_DIR     = sandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = sandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_DATA_DIR     = sandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = sandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
   const { getDb } = await import('../dist/db.js');
   getDb();
 });

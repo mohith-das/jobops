@@ -14,9 +14,9 @@ before(async () => {
   sandbox = mkdtempSync(join(tmpdir(), 'jobops-render-persist-'));
   // Point the server's data/output/project root at the sandbox BEFORE any module loads
   // config.ts (it's imported lazily by the modules under test).
-  process.env.MCP_JSA_DATA_DIR     = sandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = sandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_DATA_DIR     = sandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = sandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
   // Trigger schema creation
   const { getDb } = await import('../dist/db.js');
   getDb();

@@ -6,7 +6,7 @@
 // process owns. Surfaced three ways, all read-only:
 //   - GET /api/status            (auth-gated JSON — the CLI `status` command hits this)
 //   - the `doctor` MCP tool      (a "Server" check row in server context)
-//   - `npx job_ops-mcp status`   (CLI, queries a RUNNING server over HTTP)
+//   - `npx jobops status`   (CLI, queries a RUNNING server over HTTP)
 //
 // The point: a user running several clients (Claude Desktop, Claude Code,
 // opencode, codex, …) against one server can VERIFY they all hit the same
@@ -82,8 +82,8 @@ export function recordClientInitialize(args: { name?: string; version?: string; 
 function pkgInfo(): { name: string; version: string } {
   try {
     const p = JSON.parse(readFileSync(resolve(config.installDir, 'package.json'), 'utf-8'));
-    return { name: p.name ?? 'job_ops-mcp', version: p.version ?? '0.0.0' };
-  } catch { return { name: 'job_ops-mcp', version: 'unknown' }; }
+    return { name: p.name ?? 'jobops', version: p.version ?? '0.0.0' };
+  } catch { return { name: 'jobops', version: 'unknown' }; }
 }
 
 export function serverStatus(): ServerStatus {

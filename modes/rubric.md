@@ -4,7 +4,7 @@ Distilled from career-ops' scoring system + the JSA-style three-dimension formul
 this file to retune scoring; the MCP server loads it at runtime and serves it as a
 resource to the chat.
 
-> **Visa scoring is optional.** Set `MCP_JSA_VISA_SCORING=false` to drop `visa_fit` from
+> **Visa scoring is optional.** Set `JOBOPS_VISA_SCORING=false` to drop `visa_fit` from
 > the formula and switch to renormalized weights (`resume 0.6 + taste 0.4`). When disabled,
 > the server prepends an override block to the top of this rubric, hides the visa-related
 > tools (`visa_signal`, `import_h1b`, `import_linkedin`), and strips visa columns from
@@ -54,7 +54,7 @@ Compare the JD against `config/profile.yml` → `narrative.likes` and
 
 ### `visa_fit` — will this company / role work for someone who needs visa sponsorship?
 
-Only applied when `MCP_JSA_VISA_SCORING=true`. Pull from:
+Only applied when `JOBOPS_VISA_SCORING=true`. Pull from:
 
 - The job description itself (mentions of sponsorship, work authorization, citizenship)
 - The company's H1B record via `visa_signal(company)` (requires `import_h1b` to have been
@@ -102,7 +102,7 @@ When the chat client returns scores via `evaluate_job` it MUST emit STRICT JSON:
 }
 ```
 
-(When `MCP_JSA_VISA_SCORING=false`, omit `visa_fit` — see the override block the server
+(When `JOBOPS_VISA_SCORING=false`, omit `visa_fit` — see the override block the server
 prepends.)
 
 If you cannot parse or anything is uncertain, leave `concerns` populated and set

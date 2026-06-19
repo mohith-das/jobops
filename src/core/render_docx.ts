@@ -164,7 +164,7 @@ function resumeDocument(cv: CVData): Document {
   }
 
   return new Document({
-    creator: 'job_ops-mcp',
+    creator: 'jobops',
     title:   `${cv.name || 'Candidate'} — Resume`,
     sections: [{
       properties: { page: { margin: PAGE_MARGINS, size: { orientation: PageOrientation.PORTRAIT } } },
@@ -269,7 +269,7 @@ function coverDocument(cv: CVData, args: CoverDocxFields): Document {
   children.push(body(cv.name || 'Candidate'));
 
   return new Document({
-    creator: 'job_ops-mcp',
+    creator: 'jobops',
     title:   `${cv.name || 'Candidate'} — Cover Letter`,
     sections: [{
       properties: { page: { margin: {

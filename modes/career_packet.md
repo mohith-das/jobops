@@ -4,11 +4,11 @@ This file is the **active career packet** — the superset of every claim the ca
 allowed to make. `generate_materials(job_id)` picks subsets from this per JD; it never
 invents claims outside this set.
 
-When you run `npx job_ops-mcp init` the server seeds this from your `cv.md` +
+When you run `npx jobops init` the server seeds this from your `cv.md` +
 `config/profile.yml` and stores versioned copies in the `career_packet` table. Re-edit
 `cv.md`, then call the `update_career_packet` MCP tool to bump a new version.
 
-This file is also exposed as the `mcp-jsa://career_packet/active` MCP resource so the
+This file is also exposed as the `jobops://career_packet/active` MCP resource so the
 chat can reason against it directly without round-tripping through the DB.
 
 > **Source of truth — avoid packet drift.** The active packet in the DB is *runtime state*.
@@ -93,7 +93,7 @@ Source: `cv.md` work-experience section. One sentence per bullet, action-verb st
 - **Never invent metrics.** Only numbers that already appear here or in `cv.md` are usable.
 - **Never surface visa / work-auth** in any resume bullet, cover letter, or outreach DM.
   Visa data is internal scoring only — and the whole visa surface can be disabled via
-  `MCP_JSA_VISA_SCORING=false` if it doesn't apply to you.
+  `JOBOPS_VISA_SCORING=false` if it doesn't apply to you.
 - **Never use cliché phrases** ("passionate about", "leveraged", "spearheaded",
   "facilitated", "synergies", "robust", "seamless", "cutting-edge", "innovative",
   "results-oriented", "proven track record").

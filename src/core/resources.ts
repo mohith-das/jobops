@@ -8,7 +8,7 @@ import { getActiveCareerPacket } from './profile.js';
 import { getMode } from './modes.js';
 
 export interface ModeResource {
-  uri:         string;     // e.g. mcp-jsa://modes/rubric
+  uri:         string;     // e.g. jobops://modes/rubric
   name:        string;
   title:       string;
   mimeType:    string;
@@ -24,7 +24,7 @@ export function listResources(): ModeResource[] {
     fileResource('outreach_tone',        'Outreach Tone',           'Warm-intro + founder DM rules (char caps, never-refer-me, etc.).'),
     fileResource('negotiation_playbook', 'Negotiation Playbook',    'Scripts + frames for negotiation_brief.'),
     {
-      uri:  'mcp-jsa://career_packet/active',
+      uri:  'jobops://career_packet/active',
       name: 'career_packet',
       title: 'Active Career Packet',
       mimeType: 'text/markdown',
@@ -39,9 +39,9 @@ export function listResources(): ModeResource[] {
 
 function fileResource(slug: string, title: string, description: string): ModeResource {
   // Go through getMode() so dynamic prefixes (e.g. the VISA SCORING DISABLED block
-  // applied to rubric.md when MCP_JSA_VISA_SCORING=false) reach the chat too.
+  // applied to rubric.md when JOBOPS_VISA_SCORING=false) reach the chat too.
   return {
-    uri:  `mcp-jsa://modes/${slug}`,
+    uri:  `jobops://modes/${slug}`,
     name: slug,
     title,
     mimeType: 'text/markdown',

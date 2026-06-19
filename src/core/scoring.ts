@@ -13,7 +13,7 @@
 //   • samplingCompleter(bridge)  — routes through MCP sampling (client-borne cost);
 //   • apiCompleter()             — routes through the BYO-key provider (core/llm.ts).
 //
-// pickCompleter() chooses sampling when the client advertises it (and MCP_JSA_SAMPLING is
+// pickCompleter() chooses sampling when the client advertises it (and JOBOPS_SAMPLING is
 // not disabled), else the BYO-key provider when a key is set, else null (caller surfaces a
 // clear "use chat mode or set a key / connect a sampling client" error). Both record a row
 // in llm_calls so cost_estimate keeps working — sampling rows are tagged provider='sampling'
@@ -44,7 +44,7 @@ export interface PickedCompleter {
 
 /**
  * Choose the best available completer:
- *   1. sampling — when the connected client advertises it AND MCP_JSA_SAMPLING != false;
+ *   1. sampling — when the connected client advertises it AND JOBOPS_SAMPLING != false;
  *   2. api      — when a BYO key is configured;
  *   3. null     — neither; caller should fall back to chat mode or instruct the user.
  */

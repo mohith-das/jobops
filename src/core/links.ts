@@ -2,7 +2,7 @@
 //
 // Every URL the server returns (resume / cover PDF, .tex, .docx, eval report HTML,
 // apply_prefill screenshot, tracker home) flows through one of these helpers. The
-// helpers read `config.publicBaseUrl` which is either MCP_JSA_PUBLIC_BASE_URL (when
+// helpers read `config.publicBaseUrl` which is either JOBOPS_PUBLIC_BASE_URL (when
 // set + valid) or the local listen URL (the default — preserves the original
 // 127.0.0.1:7891 behaviour for local-only users).
 //

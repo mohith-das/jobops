@@ -1,19 +1,19 @@
-# job_ops-mcp — Operator's Guide (project memory)
+# jobops — Operator's Guide (project memory)
 
-> A self-contained reference for **job_ops-mcp**, a self-hosted Model Context Protocol (MCP)
+> A self-contained reference for **jobops**, a self-hosted Model Context Protocol (MCP)
 > server for the end-to-end job search. Drop this file into your Claude Desktop (or any MCP
 > client) **project memory** so you can ask "how do I X?" and get answers, and modify the
 > tool confidently. This documents the **tool**, not any individual's job search — it is
 > generic and public-repo-safe.
 >
-> Repo: https://github.com/mohith-das/job_ops-mcp · npm: `job_ops-mcp` · License: MIT
-> Current line: **0.12.x**. Run `npm view job_ops-mcp version` for the latest.
+> Repo: https://github.com/mohith-das/jobops · npm: `jobops` · License: MIT
+> Current line: **0.12.x**. Run `npm view jobops version` for the latest.
 
 ---
 
 ## 1. What it is — and the core split
 
-job_ops-mcp exposes a full job-search pipeline to your MCP client as **51 tools** + **6
+jobops exposes a full job-search pipeline to your MCP client as **51 tools** + **6
 editable behaviour resources**. The design principle:
 
 - **The chat client is the brain.** It reasons, scores JDs, drafts resumes/cover letters and
@@ -51,10 +51,10 @@ instantly visible in all others. Safety model: each HTTP request gets a **fresh 
 protocol instance** (`src/mcp/server.ts` — a shared instance would cross-route responses
 between overlapping clients); reads run concurrently under WAL; **all writes serialize
 through `runInWriteLock`** in the single process; `busy_timeout=5000` covers a second
-*process* on the same DB file (e.g. a stdio instance). `npx job_ops-mcp connect` prints
-per-client config; `npx job_ops-mcp status` (or the `doctor` tool) verifies uptime, the
+*process* on the same DB file (e.g. a stdio instance). `npx jobops connect` prints
+per-client config; `npx jobops status` (or the `doctor` tool) verifies uptime, the
 source-of-truth DB path + fingerprint, and which clients have connected. Beyond localhost,
-`MCP_JSA_AUTH_TOKEN` is mandatory (default-deny) and goes into every client's config.
+`JOBOPS_AUTH_TOKEN` is mandatory (default-deny) and goes into every client's config.
 stdio mode stays available as the single-client alternative (private process; needs its
 own port next to a running shared server).
 
@@ -209,7 +209,7 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   write `profile.yml`, and reseed in one step (see §8).
 - `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as
   client-borne $0).
-- `doctor` — **read-only health report** (same checks as the `npx job_ops-mcp doctor` CLI):
+- `doctor` — **read-only health report** (same checks as the `npx jobops doctor` CLI):
   packet ↔ cv.md sync state (incl. chat-edited / cv-edited-after-reseed), LLM provider+key,
   sampling + auth posture, active template, modes (bundled vs overridden), visa scoring,
   public base URL, Chromium, Node, config files. Returns structured `{ ok, counts, checks[],
@@ -218,7 +218,7 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 **Apply (preview only — never submits)**
 - `apply_prefill` — opens the application page, drafts field values, screenshots, and stops.
 
-**Visa (optional; hidden when `MCP_JSA_VISA_SCORING=false`)**
+**Visa (optional; hidden when `JOBOPS_VISA_SCORING=false`)**
 - `visa_signal` — H1B-friendliness band for a company (internal scoring only).
 - `import_h1b` — bulk-load a DOL OFLC LCA disclosure CSV.
 - `import_linkedin` — bulk-load a LinkedIn `Connections.csv` (path can be captured
@@ -234,21 +234,21 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 
 | Var | Default | Purpose |
 |---|---|---|
-| `MCP_JSA_PORT` | `7891` | HTTP port (MCP + file server + dashboard) |
-| `MCP_JSA_HOST` | `127.0.0.1` | Bind host. Non-localhost ⇒ requires `MCP_JSA_AUTH_TOKEN` (see §10) |
-| `MCP_JSA_PROJECT_ROOT` | cwd | Where `cv.md` / `config/profile.yml` / `portals.yml` / `modes/` live |
-| `MCP_JSA_DATA_DIR` | `<root>/data` | SQLite DB + WAL |
-| `MCP_JSA_OUTPUT_DIR` | `<root>/output` | Rendered artifacts (PDF/tex/docx/report HTML) |
-| `MCP_JSA_PUBLIC_BASE_URL` | host:port | URL emitted in artifact links (set on remote/Tailscale/LAN) |
-| `MCP_JSA_TEMPLATE_DIR` | _empty_ | User theme dir; overrides bundled themes of the same name |
-| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used by `render_pdf` when no `template` arg given |
-| `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files`, dashboard. **Required** for non-localhost bind |
-| `MCP_JSA_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **if the client advertises it** (most, incl. Claude Desktop, don't → BYO key used); `false` always uses BYO key |
-| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client lacks sampling (the common case): `gemini` / `deepseek` / `none` |
-| `MCP_JSA_LLM_MODEL` | _empty_ | Provider model id |
+| `JOBOPS_PORT` | `7891` | HTTP port (MCP + file server + dashboard) |
+| `JOBOPS_HOST` | `127.0.0.1` | Bind host. Non-localhost ⇒ requires `JOBOPS_AUTH_TOKEN` (see §10) |
+| `JOBOPS_PROJECT_ROOT` | cwd | Where `cv.md` / `config/profile.yml` / `portals.yml` / `modes/` live |
+| `JOBOPS_DATA_DIR` | `<root>/data` | SQLite DB + WAL |
+| `JOBOPS_OUTPUT_DIR` | `<root>/output` | Rendered artifacts (PDF/tex/docx/report HTML) |
+| `JOBOPS_PUBLIC_BASE_URL` | host:port | URL emitted in artifact links (set on remote/Tailscale/LAN) |
+| `JOBOPS_TEMPLATE_DIR` | _empty_ | User theme dir; overrides bundled themes of the same name |
+| `JOBOPS_DEFAULT_TEMPLATE` | `default` | Theme used by `render_pdf` when no `template` arg given |
+| `JOBOPS_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files`, dashboard. **Required** for non-localhost bind |
+| `JOBOPS_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **if the client advertises it** (most, incl. Claude Desktop, don't → BYO key used); `false` always uses BYO key |
+| `JOBOPS_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client lacks sampling (the common case): `gemini` / `deepseek` / `none` |
+| `JOBOPS_LLM_MODEL` | _empty_ | Provider model id |
 | `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials — needed for `api`/batch unless the client supports sampling (most don't); `mode="chat"` never needs a key |
-| `MCP_JSA_VISA_SCORING` | `true` | `false` drops visa from the rubric + hides the visa tools |
-| `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
+| `JOBOPS_VISA_SCORING` | `true` | `false` drops visa from the rubric + hides the visa tools |
+| `JOBOPS_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
 
 ---
 
@@ -256,7 +256,7 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 
 ```bash
 # 1. Scaffold cv.md, config/profile.yml, portals.yml, modes/*.md + the SQLite DB
-npx job_ops-mcp@latest init        # idempotent; never overwrites edited files
+npx jobops@latest init        # idempotent; never overwrites edited files
 
 # 2. Edit the three source files — replace every <TODO> placeholder:
 #    cv.md            → your experience, projects, skills, education
@@ -265,13 +265,13 @@ npx job_ops-mcp@latest init        # idempotent; never overwrites edited files
 #    (optional) modes/*.md → tune rubric / tailoring / tone
 
 # 3. Rebuild the career packet from your now-real cv.md + profile.yml
-npx job_ops-mcp@latest reseed
+npx jobops@latest reseed
 
 # 4. Confirm wiring (Node, Chromium, files, modes, auth, scoring backend, packet freshness)
-npx job_ops-mcp@latest doctor
+npx jobops@latest doctor
 
 # 5. Boot (HTTP). Chromium auto-installs on first run.
-npx job_ops-mcp@latest start
+npx jobops@latest start
 ```
 
 CLI commands: `init`, `start`, `start --stdio`, `reseed`, `templates`, `doctor`, `connect`
@@ -285,13 +285,13 @@ source-of-truth DB + fingerprint, clients seen; flags `--url --token`), `help`, 
 ```jsonc
 {
   "mcpServers": {
-    "job_ops-mcp": {
+    "jobops": {
       "command": "npx",
-      "args": ["-y", "job_ops-mcp@0.8.0", "start", "--stdio"],
+      "args": ["-y", "jobops@0.8.0", "start", "--stdio"],
       "env": {
-        "MCP_JSA_PORT": "7891",
-        "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search-dir"
-        // optional: MCP_JSA_TEMPLATE_DIR, MCP_JSA_DEFAULT_TEMPLATE, MCP_JSA_VISA_SCORING, ...
+        "JOBOPS_PORT": "7891",
+        "JOBOPS_PROJECT_ROOT": "/absolute/path/to/your/job-search-dir"
+        // optional: JOBOPS_TEMPLATE_DIR, JOBOPS_DEFAULT_TEMPLATE, JOBOPS_VISA_SCORING, ...
       }
     }
   }
@@ -306,7 +306,7 @@ Run `connect` to print ready-made config blocks.
 In `librechat.yaml`:
 ```yaml
 mcpServers:
-  job_ops-mcp:
+  jobops:
     type: streamable-http
     url: http://127.0.0.1:7891/mcp
     timeout: 60000
@@ -317,7 +317,7 @@ Inside a container `127.0.0.1` is the container, not the host. Use `host.docker.
 (Docker Desktop) or a LAN IP, **and** allowlist it (LibreChat blocks private addrs by default):
 ```yaml
 mcpServers:
-  job_ops-mcp:
+  jobops:
     type: streamable-http
     url: http://host.docker.internal:7891/mcp
     timeout: 60000
@@ -339,11 +339,11 @@ repo for the full placeholder contract, e.g. `{{HEADER}}`, `{{EXPERIENCE}}`,
 
 ```bash
 mkdir -p ~/job-themes/mytheme        # author resume.tex/cover.tex/resume.html/cover.html
-export MCP_JSA_TEMPLATE_DIR=~/job-themes
-export MCP_JSA_DEFAULT_TEMPLATE=mytheme    # or pass template="mytheme" to render_pdf
-npx job_ops-mcp templates            # lists bundled + user themes; marks the default
+export JOBOPS_TEMPLATE_DIR=~/job-themes
+export JOBOPS_DEFAULT_TEMPLATE=mytheme    # or pass template="mytheme" to render_pdf
+npx jobops templates            # lists bundled + user themes; marks the default
 ```
-The loader checks `MCP_JSA_TEMPLATE_DIR` first, so a `default/` folder there overrides the
+The loader checks `JOBOPS_TEMPLATE_DIR` first, so a `default/` folder there overrides the
 bundled default; brand-new themes are also picked up. A theme missing a placeholder drops
 that section gracefully; in `.tex` themes a `%`-commented placeholder
 (`% {{SUMMARY_SECTION}}`) drops it too — substitution skips LaTeX comments. A malformed
@@ -381,11 +381,11 @@ advertises the `sampling` capability** in its initialize handshake.
   correct. The transport is **not** sufficient on its own; it's a per-client capability.
   Current support: modelcontextprotocol.io/clients.
 - It engages **automatically if (and only if) a sampling-capable client connects** — no config.
-- Selection order: **sampling (only if advertised) → BYO key (`MCP_JSA_LLM_PROVIDER` + key) → chat mode**.
+- Selection order: **sampling (only if advertised) → BYO key (`JOBOPS_LLM_PROVIDER` + key) → chat mode**.
 - Cost is **client-borne**; `cost_estimate` records sampling calls and flags them $0 server cost.
 - **Transport gate (necessary, not sufficient):** sampling is a server→client request, so stdio
   is required (stateless HTTP can't deliver it and never tries) — but a stdio client still must
-  advertise `sampling`. `MCP_JSA_SAMPLING=false` forces the BYO-key path.
+  advertise `sampling`. `JOBOPS_SAMPLING=false` forces the BYO-key path.
 - Run the **`doctor` tool** for the LIVE state: "sampling not advertised by current client →
   using BYO key" vs "sampling available → key optional".
 
@@ -401,7 +401,7 @@ advertises the `sampling` capability** in its initialize handshake.
 The server handles PII (resume PDFs, connections, employer signal). Posture is decided by
 bind host + token:
 
-| Bind host | `MCP_JSA_AUTH_TOKEN` | Result |
+| Bind host | `JOBOPS_AUTH_TOKEN` | Result |
 |---|---|---|
 | `127.0.0.1` (default) | unset | **Open** — frictionless local use |
 | `127.0.0.1` | set | Token required (opt-in even locally) |
@@ -413,9 +413,9 @@ carry a `WWW-Authenticate` header → `/.well-known/oauth-protected-resource` (a
 MCP 2025-06-18 OAuth Resource Server model, static-token form). Always open: `/healthz`.
 To expose remotely:
 ```bash
-export MCP_JSA_HOST=0.0.0.0
-export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
-export MCP_JSA_PUBLIC_BASE_URL="https://your-host.example"
+export JOBOPS_HOST=0.0.0.0
+export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"
+export JOBOPS_PUBLIC_BASE_URL="https://your-host.example"
 ```
 
 ---
@@ -443,7 +443,7 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
 ## 10. Troubleshooting
 
 - **`EADDRINUSE` on (re)start** — a previous server still holds the port. Find and kill it:
-  `lsof -nP -iTCP:7891 -sTCP:LISTEN` then `kill <PID>` (or change `MCP_JSA_PORT`). With
+  `lsof -nP -iTCP:7891 -sTCP:LISTEN` then `kill <PID>` (or change `JOBOPS_PORT`). With
   Claude Desktop, fully quit the app so it stops the old stdio child before relaunch.
 - **mcp-remote bridge dies with `Unexpected content type: null`** — known upstream bug,
   NOT this server: mcp-remote (≤ 0.1.38) under Node ≥ 26 — its bundled undici
@@ -452,18 +452,18 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
   Node-24-installed mcp-remote in the client config). Affects ANY streamable-HTTP server
   behind mcp-remote, which is how to tell it apart from a real server issue.
 - **`doctor` says "cv.md was edited after the last reseed"** — your packet is stale. Run
-  `reseed` (CLI `npx job_ops-mcp reseed`, or the `reseed_career_packet` tool).
+  `reseed` (CLI `npx jobops reseed`, or the `reseed_career_packet` tool).
 - **`doctor` fails on config files / wrong directory** — `doctor`/`start` resolve files from
-  `MCP_JSA_PROJECT_ROOT` (default = current working dir). Run from your job-search dir, or
-  set `MCP_JSA_PROJECT_ROOT` to its absolute path (do this in the Claude Desktop env block).
+  `JOBOPS_PROJECT_ROOT` (default = current working dir). Run from your job-search dir, or
+  set `JOBOPS_PROJECT_ROOT` to its absolute path (do this in the Claude Desktop env block).
 - **Stale version via npx** — `npx` caches by version and reuses it. Pin an explicit version
-  in your client config (`job_ops-mcp@0.8.0`); to force-refresh a bare invocation,
-  `rm -rf ~/.npm/_npx` then `npx job_ops-mcp@latest ...`. Confirm with `--version` / `doctor`.
+  in your client config (`jobops@0.8.0`); to force-refresh a bare invocation,
+  `rm -rf ~/.npm/_npx` then `npx jobops@latest ...`. Confirm with `--version` / `doctor`.
 - **Sampling/elicitation "not working"** — they require a **stdio** client (Claude Desktop).
   Over HTTP they gate off by design; configure a BYO key, or use chat mode.
-- **Tool list looks short** — visa tools are hidden when `MCP_JSA_VISA_SCORING=false`; that's
+- **Tool list looks short** — visa tools are hidden when `JOBOPS_VISA_SCORING=false`; that's
   expected.
-- **Non-localhost bind won't start** — set `MCP_JSA_AUTH_TOKEN` (default-deny, §8).
+- **Non-localhost bind won't start** — set `JOBOPS_AUTH_TOKEN` (default-deny, §8).
 
 ---
 
@@ -475,7 +475,7 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
   config/profile.yml     # source of truth: identity, target roles, taglines, comp/location
   portals.yml            # tracked companies + scan filters
   modes/                 # (optional) editable behaviour files — created by `init`
-  data/                  # SQLite DB (mcp-jsa.db) + WAL — RUNTIME STATE
+  data/                  # SQLite DB (jobops.db) + WAL — RUNTIME STATE
   output/                # rendered PDFs / .tex / .docx / report HTML
 ```
 

@@ -46,9 +46,9 @@ function formatUptime(s: number): string {
 function pkgInfo(): { name: string; version: string } {
   try {
     const p = JSON.parse(readFileSync(resolve(config.installDir, 'package.json'), 'utf-8'));
-    return { name: p.name ?? 'job_ops-mcp', version: p.version ?? '0.0.0' };
+    return { name: p.name ?? 'jobops', version: p.version ?? '0.0.0' };
   } catch {
-    return { name: 'job_ops-mcp', version: 'unknown' };
+    return { name: 'jobops', version: 'unknown' };
   }
 }
 
@@ -108,7 +108,7 @@ export async function runDoctorChecks(
         ? { id: `file:${file}`, label: 'Config file', status: 'warn', detail: `${file} present but suspiciously small (${size} bytes) — did you replace the placeholders?` }
         : { id: `file:${file}`, label: 'Config file', status: 'pass', detail: `${file} (${size} bytes)` });
     } else {
-      add({ id: `file:${file}`, label: 'Config file', status: 'fail', detail: `${file} missing`, fix: 'npx job_ops-mcp init' });
+      add({ id: `file:${file}`, label: 'Config file', status: 'fail', detail: `${file} missing`, fix: 'npx jobops init' });
     }
   }
 
@@ -135,7 +135,7 @@ export async function runDoctorChecks(
   const CLIENTS_DOC = 'see modelcontextprotocol.io/clients for current sampling support';
   if (!config.samplingEnabled) {
     add({ id: 'sampling', label: 'Scoring', status: 'warn',
-          detail: 'MCP sampling disabled (MCP_JSA_SAMPLING=false) — batch/api scoring requires a BYO LLM key (Gemini/DeepSeek).' });
+          detail: 'MCP sampling disabled (JOBOPS_SAMPLING=false) — batch/api scoring requires a BYO LLM key (Gemini/DeepSeek).' });
   } else if (opts.sampling) {
     // Server tool: report the LIVE negotiated state with the connected client.
     const s = opts.sampling;
@@ -166,12 +166,12 @@ export async function runDoctorChecks(
     const def    = effectiveDefaultTemplate();
     const userCount    = themes.filter(t => t.source === 'user').length;
     const bundledCount = themes.length - userCount;
-    const misconfigured = !!process.env.MCP_JSA_DEFAULT_TEMPLATE && process.env.MCP_JSA_DEFAULT_TEMPLATE !== def;
+    const misconfigured = !!process.env.JOBOPS_DEFAULT_TEMPLATE && process.env.JOBOPS_DEFAULT_TEMPLATE !== def;
     add({
       id: 'templates', label: 'Templates',
       status: misconfigured ? 'warn' : 'pass',
       detail: `${bundledCount} bundled${userCount ? `, ${userCount} user` : ''} — default: ${def}`
-            + (misconfigured ? ` (MCP_JSA_DEFAULT_TEMPLATE="${process.env.MCP_JSA_DEFAULT_TEMPLATE}" not found, fell back to "${def}")` : ''),
+            + (misconfigured ? ` (JOBOPS_DEFAULT_TEMPLATE="${process.env.JOBOPS_DEFAULT_TEMPLATE}" not found, fell back to "${def}")` : ''),
     });
   } catch (e: any) {
     add({ id: 'templates', label: 'Templates', status: 'warn', detail: `templates check failed: ${e?.message ?? e}` });
@@ -198,19 +198,19 @@ export async function runDoctorChecks(
   // 9. Auth posture (PII surface protection).
   const ap = config.authPolicy;
   if (ap.mode === 'open') {
-    add({ id: 'auth', label: 'Auth', status: 'pass', detail: 'open (localhost-only bind — frictionless, no token). To expose remotely set MCP_JSA_HOST + MCP_JSA_AUTH_TOKEN.' });
+    add({ id: 'auth', label: 'Auth', status: 'pass', detail: 'open (localhost-only bind — frictionless, no token). To expose remotely set JOBOPS_HOST + JOBOPS_AUTH_TOKEN.' });
   } else if (ap.mode === 'token') {
     add({ id: 'auth', label: 'Auth', status: 'pass', detail: `bearer token required on /mcp, /files, dashboard ${ap.isLocalhost ? '(localhost + token)' : '(remote bind — PII protected)'}` });
   } else {
-    add({ id: 'auth', label: 'Auth', status: 'fail', detail: `DENY — ${ap.reason}`, fix: 'export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"' });
+    add({ id: 'auth', label: 'Auth', status: 'fail', detail: `DENY — ${ap.reason}`, fix: 'export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"' });
   }
 
   // 10. Public base URL (what artifact links use).
   if (config.publicBaseUrlIsExplicit) {
     add({ id: 'public_base_url', label: 'Public URL', status: 'pass',
-          detail: `${config.publicBaseUrl} (from MCP_JSA_PUBLIC_BASE_URL)${config.publicBaseUrl !== config.listenUrl ? ` — listen URL is ${config.listenUrl}` : ''}` });
+          detail: `${config.publicBaseUrl} (from JOBOPS_PUBLIC_BASE_URL)${config.publicBaseUrl !== config.listenUrl ? ` — listen URL is ${config.listenUrl}` : ''}` });
   } else {
-    add({ id: 'public_base_url', label: 'Public URL', status: 'pass', detail: `${config.publicBaseUrl} (default — set MCP_JSA_PUBLIC_BASE_URL to override)` });
+    add({ id: 'public_base_url', label: 'Public URL', status: 'pass', detail: `${config.publicBaseUrl} (default — set JOBOPS_PUBLIC_BASE_URL to override)` });
   }
 
   // 11. Bind address. At cold start this is just the configured target; in a running server
@@ -253,7 +253,7 @@ export async function runDoctorChecks(
     const v = active ? `v${active.version}` : '';
     switch (status) {
       case 'no_packet':
-        add({ id: 'career_packet', label: 'Career packet', status: 'fail', detail: 'no active career_packet', fix: 'npx job_ops-mcp init' });
+        add({ id: 'career_packet', label: 'Career packet', status: 'fail', detail: 'no active career_packet', fix: 'npx jobops init' });
         break;
       case 'packet_chat_edited':
         add({ id: 'career_packet', label: 'Career packet', status: 'pass',
@@ -270,7 +270,7 @@ export async function runDoctorChecks(
         add({ id: 'career_packet', label: 'Career packet',
               status: ctx === 'server' ? 'warn' : 'fail',
               detail: `${v}: cv.md was edited after the last reseed — the packet is stale.`,
-              fix: 'reseed_career_packet (or `npx job_ops-mcp reseed`)' });
+              fix: 'reseed_career_packet (or `npx jobops reseed`)' });
         break;
       case 'packet_is_template':
         add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: `${v} still has TODO markers`, fix: 'reseed' });
@@ -280,7 +280,7 @@ export async function runDoctorChecks(
         break;
     }
   } catch {
-    add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: 'check skipped — DB not initialized', fix: 'npx job_ops-mcp init' });
+    add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: 'check skipped — DB not initialized', fix: 'npx jobops init' });
   }
 
   // ── Tally ──
@@ -290,7 +290,7 @@ export async function runDoctorChecks(
   const summary = ctx === 'server'
     ? (ok ? `Server healthy — ${counts.pass} ok, ${counts.warn} warning(s).`
           : `${counts.fail} issue(s) need attention (${counts.warn} warning(s)).`)
-    : (ok ? 'All required checks passed. Run `npx job_ops-mcp start` to boot.'
+    : (ok ? 'All required checks passed. Run `npx jobops start` to boot.'
           : `${counts.fail} check(s) failed.`);
 
   return { ok, context: ctx, package: pkgInfo(), counts, checks, summary };

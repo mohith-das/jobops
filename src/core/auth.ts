@@ -16,7 +16,7 @@
 // resource, 401s carry a WWW-Authenticate header pointing at the protected-resource
 // metadata document, and the token is verified through an OAuthTokenVerifier. Full OAuth
 // authorization-server flows (dynamic client registration, token issuance) are out of
-// scope — the operator sets one static token via MCP_JSA_AUTH_TOKEN.
+// scope — the operator sets one static token via JOBOPS_AUTH_TOKEN.
 
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
@@ -57,7 +57,7 @@ export function resolveAuthPolicy(args: { host: string; token: string | null | u
   if (isLocalhost) {
     if (token) {
       return { mode: 'token', requireToken: true, isLocalhost, token,
-               reason: 'localhost bind with MCP_JSA_AUTH_TOKEN set — bearer auth enforced even locally' };
+               reason: 'localhost bind with JOBOPS_AUTH_TOKEN set — bearer auth enforced even locally' };
     }
     return { mode: 'open', requireToken: false, isLocalhost, token: null,
              reason: 'localhost-only bind — frictionless, no token required' };
@@ -65,11 +65,11 @@ export function resolveAuthPolicy(args: { host: string; token: string | null | u
 
   if (!token) {
     return { mode: 'deny', requireToken: true, isLocalhost, token: null,
-             reason: 'non-localhost bind without MCP_JSA_AUTH_TOKEN — remote access DENIED (default-deny). '
-                   + 'Set MCP_JSA_AUTH_TOKEN to a strong secret to expose this server beyond localhost.' };
+             reason: 'non-localhost bind without JOBOPS_AUTH_TOKEN — remote access DENIED (default-deny). '
+                   + 'Set JOBOPS_AUTH_TOKEN to a strong secret to expose this server beyond localhost.' };
   }
   return { mode: 'token', requireToken: true, isLocalhost, token,
-           reason: 'non-localhost bind with MCP_JSA_AUTH_TOKEN — bearer auth required on /mcp, /files, and dashboard' };
+           reason: 'non-localhost bind with JOBOPS_AUTH_TOKEN — bearer auth required on /mcp, /files, and dashboard' };
 }
 
 // Constant-time string compare (avoids leaking the token length-by-length via timing).
@@ -104,7 +104,7 @@ export class StaticTokenVerifier implements OAuthTokenVerifier {
     }
     return {
       token,
-      clientId: 'mcp-jsa-operator',
+      clientId: 'jobops-operator',
       scopes:   ['mcp:full'],
       resource: this.resource,
     };
@@ -120,16 +120,16 @@ export function bearerAuthMiddleware(token: string, resourceMetadataUrl?: string
   return (req: Request, res: Response, next: NextFunction) => {
     const presented = bearerFromHeader(req.headers['authorization'] as string | undefined);
     if (presented && tokensMatch(presented, token)) {
-      (req as any).auth = { token: presented, clientId: 'mcp-jsa-operator', scopes: ['mcp:full'] } satisfies AuthInfo;
+      (req as any).auth = { token: presented, clientId: 'jobops-operator', scopes: ['mcp:full'] } satisfies AuthInfo;
       return next();
     }
     const meta = resourceMetadataUrl ? `, resource_metadata="${resourceMetadataUrl}"` : '';
-    res.setHeader('WWW-Authenticate', `Bearer realm="mcp-jsa"${meta}`);
+    res.setHeader('WWW-Authenticate', `Bearer realm="jobops"${meta}`);
     res.status(401).json({
       error: 'unauthorized',
       error_description: presented
         ? 'Invalid bearer token.'
-        : 'Missing bearer token. This server requires Authorization: Bearer <token> because it is bound to a non-localhost address (or MCP_JSA_AUTH_TOKEN is set).',
+        : 'Missing bearer token. This server requires Authorization: Bearer <token> because it is bound to a non-localhost address (or JOBOPS_AUTH_TOKEN is set).',
     });
   };
 }
@@ -142,7 +142,7 @@ export function protectedResourceMetadata(resourceUrl: string): Record<string, u
   return {
     resource: resourceUrl,
     bearer_methods_supported: ['header'],
-    resource_name: 'job_ops-mcp',
+    resource_name: 'jobops',
     // No external authorization server — the operator provisions a static token.
     authorization_servers: [],
     scopes_supported: ['mcp:full'],

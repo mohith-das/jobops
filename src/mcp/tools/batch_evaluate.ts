@@ -33,7 +33,7 @@ export const batchEvaluateTool = defineTool({
     if (!picked) {
       return errResult(
         'No scoring backend available. Either: connect an MCP client that supports sampling ' +
-        '(no key needed), OR set MCP_JSA_LLM_PROVIDER=gemini with GEMINI_API_KEY, OR use ' +
+        '(no key needed), OR set JOBOPS_LLM_PROVIDER=gemini with GEMINI_API_KEY, OR use ' +
         'evaluate_job mode=chat for the manual path.',
       );
     }

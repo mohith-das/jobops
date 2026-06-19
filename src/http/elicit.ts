@@ -107,7 +107,7 @@ function shell(title: string, body: string): string {
 function formPage(p: PendingCapture): string {
   return shell('Provide a value securely', `
     <h2>${esc(p.label)}</h2>
-    <p class="note">This value is sent directly to your local job_ops-mcp server and never passes through your chat client.</p>
+    <p class="note">This value is sent directly to your local jobops server and never passes through your chat client.</p>
     <form method="post">
       <input name="value" autofocus autocomplete="off" placeholder="Enter the value…" />
       <button type="submit">Submit securely</button>

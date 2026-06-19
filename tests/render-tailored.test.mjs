@@ -56,11 +56,11 @@ NYC · Jun 2023 – Dec 2023
 `);
   writeFileSync(resolve(sandbox, 'portals.yml'), `tracked_companies: []\n`);
 
-  process.env.MCP_JSA_DATA_DIR     = resolve(sandbox, 'data');
-  process.env.MCP_JSA_OUTPUT_DIR   = resolve(sandbox, 'output');
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
-  delete process.env.MCP_JSA_TEMPLATE_DIR;
-  delete process.env.MCP_JSA_DEFAULT_TEMPLATE;
+  process.env.JOBOPS_DATA_DIR     = resolve(sandbox, 'data');
+  process.env.JOBOPS_OUTPUT_DIR   = resolve(sandbox, 'output');
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
+  delete process.env.JOBOPS_TEMPLATE_DIR;
+  delete process.env.JOBOPS_DEFAULT_TEMPLATE;
   const { getDb } = await import('../dist/db.js');
   getDb();
 });

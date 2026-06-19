@@ -79,7 +79,7 @@ export const updateProfileTool = defineTool({
     if (!content) {
       if (ctx?.bridge?.canElicit()) {
         const r = await ctx.bridge.elicitForm({
-          message: 'Update your job_ops-mcp profile. Leave any field blank to keep its current value. '
+          message: 'Update your jobops profile. Leave any field blank to keep its current value. '
                  + 'Taglines auto-fill career-packet Section 2 (one per archetype).',
           requestedSchema: FORM_SCHEMA,
         });

@@ -1,4 +1,4 @@
-// Unit tests for MCP_JSA_PUBLIC_BASE_URL.
+// Unit tests for JOBOPS_PUBLIC_BASE_URL.
 //   - resolvePublicBaseUrl(): default / set / trailing-slash / malformed / non-http scheme
 //   - fileUrl() / trackerUrl() / mcpUrl(): respect the provided base, strip trailing slash
 //
@@ -17,13 +17,13 @@ const LISTEN = 'http://127.0.0.1:7891';
 // ── resolvePublicBaseUrl ────────────────────────────────────────────────────
 
 function withEnv(value, fn) {
-  const original = process.env.MCP_JSA_PUBLIC_BASE_URL;
-  if (value === null) delete process.env.MCP_JSA_PUBLIC_BASE_URL;
-  else process.env.MCP_JSA_PUBLIC_BASE_URL = value;
+  const original = process.env.JOBOPS_PUBLIC_BASE_URL;
+  if (value === null) delete process.env.JOBOPS_PUBLIC_BASE_URL;
+  else process.env.JOBOPS_PUBLIC_BASE_URL = value;
   try { return fn(); }
   finally {
-    if (original === undefined) delete process.env.MCP_JSA_PUBLIC_BASE_URL;
-    else process.env.MCP_JSA_PUBLIC_BASE_URL = original;
+    if (original === undefined) delete process.env.JOBOPS_PUBLIC_BASE_URL;
+    else process.env.JOBOPS_PUBLIC_BASE_URL = original;
   }
 }
 
@@ -85,7 +85,7 @@ test('malformed value warns + falls back to listenUrl', () => {
     const { result, warnings } = muteWarnings(() => resolvePublicBaseUrl(LISTEN));
     assert.equal(result.publicBaseUrl, LISTEN);
     assert.equal(result.publicBaseUrlIsExplicit, false);
-    assert.ok(warnings.some(w => w.includes('MCP_JSA_PUBLIC_BASE_URL')),
+    assert.ok(warnings.some(w => w.includes('JOBOPS_PUBLIC_BASE_URL')),
       `expected warning, got: ${warnings.join(' | ')}`);
   });
 });

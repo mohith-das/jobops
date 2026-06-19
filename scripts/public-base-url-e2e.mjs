@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end check for MCP_JSA_PUBLIC_BASE_URL.
+// End-to-end check for JOBOPS_PUBLIC_BASE_URL.
 //
 // Boots the server three times and verifies the URLs every link-emitting surface
 // returns:
@@ -67,10 +67,10 @@ async function bootServer(env, port) {
   const child = spawn('node', [resolve(REPO, 'dist/cli.js'), 'start'], {
     env: {
       ...process.env,
-      MCP_JSA_PORT:         String(port),
-      MCP_JSA_PROJECT_ROOT: SBOX,
-      MCP_JSA_DATA_DIR:     resolve(SBOX, 'data-' + port),
-      MCP_JSA_OUTPUT_DIR:   resolve(SBOX, 'output-' + port),
+      JOBOPS_PORT:         String(port),
+      JOBOPS_PROJECT_ROOT: SBOX,
+      JOBOPS_DATA_DIR:     resolve(SBOX, 'data-' + port),
+      JOBOPS_OUTPUT_DIR:   resolve(SBOX, 'output-' + port),
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -163,14 +163,14 @@ async function gatherLinks(port) {
 
 async function runScenario(label, envVar, port, expectedBase, options = {}) {
   console.log(`\n=== ${label}  (port ${port}${envVar ? `, env=${envVar}` : ', env=UNSET'}) ===`);
-  const env = envVar ? { MCP_JSA_PUBLIC_BASE_URL: envVar } : {};
+  const env = envVar ? { JOBOPS_PUBLIC_BASE_URL: envVar } : {};
   const { child, banner } = await bootServer(env, port);
 
   try {
     if (options.malformed) {
       // Boot succeeded ⇒ malformed value did not crash. Check warning landed on stderr.
       const text = banner.join('');
-      note(/MCP_JSA_PUBLIC_BASE_URL/.test(text) && /WARN/.test(text)
+      note(/JOBOPS_PUBLIC_BASE_URL/.test(text) && /WARN/.test(text)
             ? 'PASS' : 'FAIL',
            `${label}: server boots + warns about malformed value`,
            text.includes('WARN') ? '' : text.slice(-200));
@@ -210,7 +210,7 @@ async function runScenario(label, envVar, port, expectedBase, options = {}) {
     note(wrong === 0 ? 'PASS' : 'FAIL', `${label}: all ${urls.length} links use ${expectedBase}`,
          wrong ? `${wrong} mismatched` : '');
 
-    // When MCP_JSA_PUBLIC_BASE_URL is set to a non-localhost value, ZERO links
+    // When JOBOPS_PUBLIC_BASE_URL is set to a non-localhost value, ZERO links
     // should still contain 127.0.0.1 anywhere in the string.
     if (options.requireNoLocalhost) {
       const stragglers = urls.filter(([_, u]) => u.includes('127.0.0.1'));
@@ -227,10 +227,10 @@ async function runScenario(label, envVar, port, expectedBase, options = {}) {
 
 function runDoctor(envVar) {
   const env = envVar
-    ? { ...process.env, MCP_JSA_PUBLIC_BASE_URL: envVar, MCP_JSA_PROJECT_ROOT: SBOX }
-    : { ...process.env, MCP_JSA_PROJECT_ROOT: SBOX };
-  delete env.MCP_JSA_PUBLIC_BASE_URL;
-  if (envVar) env.MCP_JSA_PUBLIC_BASE_URL = envVar;
+    ? { ...process.env, JOBOPS_PUBLIC_BASE_URL: envVar, JOBOPS_PROJECT_ROOT: SBOX }
+    : { ...process.env, JOBOPS_PROJECT_ROOT: SBOX };
+  delete env.JOBOPS_PUBLIC_BASE_URL;
+  if (envVar) env.JOBOPS_PUBLIC_BASE_URL = envVar;
   const r = spawnSync('node', [resolve(REPO, 'dist/cli.js'), 'doctor'], { env, encoding: 'utf-8' });
   return (r.stdout ?? '') + '\n' + (r.stderr ?? '');
 }
@@ -245,14 +245,14 @@ async function checkDoctor() {
 
   console.log('\n=== doctor — set ===');
   const set = runDoctor('http://test-host:9999');
-  note(/public base URL:.*test-host:9999/.test(set) && /MCP_JSA_PUBLIC_BASE_URL/.test(set)
+  note(/public base URL:.*test-host:9999/.test(set) && /JOBOPS_PUBLIC_BASE_URL/.test(set)
     ? 'PASS' : 'FAIL',
     'doctor set reports configured value',
     set.match(/public base URL:.*$/m)?.[0] ?? set.slice(-200));
 
   console.log('\n=== doctor — malformed ===');
   const bad = runDoctor('not-a-url');
-  note(/WARN.*MCP_JSA_PUBLIC_BASE_URL/.test(bad) && !/Error|Exception|stack/.test(bad)
+  note(/WARN.*JOBOPS_PUBLIC_BASE_URL/.test(bad) && !/Error|Exception|stack/.test(bad)
     ? 'PASS' : 'FAIL',
     'doctor malformed warns but does not crash',
     bad.match(/WARN.*$/m)?.[0] ?? bad.slice(-200));

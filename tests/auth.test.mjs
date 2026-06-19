@@ -60,11 +60,11 @@ let server, baseUrl;
 
 before(async () => {
   // Configure a non-localhost bind WITH a token BEFORE config.ts loads.
-  process.env.MCP_JSA_HOST = '0.0.0.0';
-  process.env.MCP_JSA_AUTH_TOKEN = TOKEN;
-  process.env.MCP_JSA_DATA_DIR = '/tmp/jobops-auth-test-data';
-  process.env.MCP_JSA_OUTPUT_DIR = '/tmp/jobops-auth-test-out';
-  process.env.MCP_JSA_PROJECT_ROOT = '/tmp/jobops-auth-test-data';
+  process.env.JOBOPS_HOST = '0.0.0.0';
+  process.env.JOBOPS_AUTH_TOKEN = TOKEN;
+  process.env.JOBOPS_DATA_DIR = '/tmp/jobops-auth-test-data';
+  process.env.JOBOPS_OUTPUT_DIR = '/tmp/jobops-auth-test-out';
+  process.env.JOBOPS_PROJECT_ROOT = '/tmp/jobops-auth-test-data';
 
   const { buildHttpApp } = await import('../dist/http/app.js');
   const app = buildHttpApp();

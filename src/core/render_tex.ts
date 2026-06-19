@@ -26,7 +26,7 @@ export interface CoverFields {
 }
 
 export interface BuildTexOpts {
-  /** Theme name. Defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+  /** Theme name. Defaults to JOBOPS_DEFAULT_TEMPLATE or "default". */
   theme?:  string;
   /** Overlay this job's persisted tailored materials onto the content. */
   job_id?: string;
@@ -47,7 +47,7 @@ export function buildResumeTex(opts: BuildTexOpts = {}): string {
   }
 }
 
-/** Build the cover .tex. `theme` defaults to MCP_JSA_DEFAULT_TEMPLATE or "default". */
+/** Build the cover .tex. `theme` defaults to JOBOPS_DEFAULT_TEMPLATE or "default". */
 export function buildCoverTex(args: CoverFields, opts: BuildTexOpts = {}): string {
   const theme = opts.theme ?? effectiveDefaultTemplate();
   try {

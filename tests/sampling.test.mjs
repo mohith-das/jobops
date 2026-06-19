@@ -29,13 +29,13 @@ const SCORE_JSON = JSON.stringify({
 let sandbox;
 before(async () => {
   sandbox = mkdtempSync(join(tmpdir(), 'jobops-sampling-'));
-  process.env.MCP_JSA_DATA_DIR     = sandbox;
-  process.env.MCP_JSA_OUTPUT_DIR   = sandbox + '/output';
-  process.env.MCP_JSA_PROJECT_ROOT = sandbox;
-  process.env.MCP_JSA_SAMPLING     = 'true';
+  process.env.JOBOPS_DATA_DIR     = sandbox;
+  process.env.JOBOPS_OUTPUT_DIR   = sandbox + '/output';
+  process.env.JOBOPS_PROJECT_ROOT = sandbox;
+  process.env.JOBOPS_SAMPLING     = 'true';
   delete process.env.GEMINI_API_KEY;
   delete process.env.DEEPSEEK_API_KEY;
-  process.env.MCP_JSA_LLM_PROVIDER = 'none';
+  process.env.JOBOPS_LLM_PROVIDER = 'none';
   const { getDb } = await import('../dist/db.js');
   getDb();
 });

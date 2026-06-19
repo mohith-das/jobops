@@ -1,4 +1,4 @@
-# job_ops-mcp
+# jobops
 
 A self-hosted **Model Context Protocol** server for the full job-search loop — portal
 scanning, JD evaluation, tailored resume + cover PDFs, outreach drafting, story bank,
@@ -16,24 +16,24 @@ back as an `http://localhost:7891/...` link.
 
 ```bash
 # 1. Scaffold your working directory (cv.md, profile.yml, portals.yml, modes/*.md + SQLite DB)
-npx job_ops-mcp init
+npx jobops init
 
 # 2. Open cv.md, config/profile.yml, portals.yml and replace every <TODO> placeholder.
 #    (Optional: tune modes/*.md — rubric, tailoring rules, outreach tone — your edits win.)
 
 # 3. Rebuild the career_packet from your now-real cv.md
 #    (or just re-run `init` — it auto-reseeds when it detects cv.md changed)
-npx job_ops-mcp reseed
+npx jobops reseed
 
 # 4. Confirm everything is wired
-npx job_ops-mcp doctor
+npx jobops doctor
 
 # 5. Boot the server (Chromium auto-installs on first run)
-npx job_ops-mcp start
-#  ▷ job_ops-mcp listening on http://127.0.0.1:7891
+npx jobops start
+#  ▷ jobops listening on http://127.0.0.1:7891
 
 # 6. Get a copy-paste config block for your MCP client
-npx job_ops-mcp connect
+npx jobops connect
 
 # 7. Paste a job URL or pasted JD into your chat — the chat calls evaluate_job, draws on
 #    your rubric + career_packet + tailoring rules, and walks the rest of the workflow.
@@ -70,8 +70,8 @@ and brings any prior version back (restore is itself reversible).
 `config/profile.yml`, then **reseed** to rebuild the packet from them:
 
 ```bash
-npx job_ops-mcp reseed            # safe: refuses if the packet has chat edits not in cv.md
-npx job_ops-mcp reseed --force    # rebuild from cv.md anyway (drops chat edits)
+npx jobops reseed            # safe: refuses if the packet has chat edits not in cv.md
+npx jobops reseed --force    # rebuild from cv.md anyway (drops chat edits)
 ```
 
 **Bringing the two back in sync.** When you've been editing in chat and want `cv.md` to
@@ -137,7 +137,7 @@ tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all load
 `modes/*.md` and live-reloaded on edit. Tune scoring or tone without touching code.
 
 > **Tip:** ask the chat to run **`doctor`** anytime — it's a read-only health report (same
-> checks as the `npx job_ops-mcp doctor` CLI command) covering packet ↔ cv.md sync state,
+> checks as the `npx jobops doctor` CLI command) covering packet ↔ cv.md sync state,
 > LLM provider/key, sampling + auth posture, active template, modes, visa scoring, and the
 > public base URL. Handy for "is my server wired right?" without leaving chat.
 
@@ -206,7 +206,7 @@ The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) can run on you
 > ⚠️ **Most clients don't (yet) — including Claude Desktop, as of now.** Claude Desktop
 > advertises only its UI extension, never `sampling`. The transport (stdio vs HTTP) is **not**
 > sufficient on its own — it's a per-client *capability*. So on Claude Desktop and similar
-> clients, batch/api scoring **falls back to the BYO key** (`MCP_JSA_LLM_PROVIDER` + key),
+> clients, batch/api scoring **falls back to the BYO key** (`JOBOPS_LLM_PROVIDER` + key),
 > which is expected and correct. Check current support at
 > [modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients).
 
@@ -216,13 +216,13 @@ The scoring tools (`batch_evaluate`, `evaluate_job` `mode="api"`) can run on you
   transport can't, so it never even tries). When sampling isn't available, scoring uses the
   BYO key; if that isn't set either, `evaluate_job mode="chat"` (the default) still works —
   your chat scores it directly. Fallback is clean (no hang).
-- **Bottom line for Claude Desktop users:** set `MCP_JSA_LLM_PROVIDER` + the matching key
+- **Bottom line for Claude Desktop users:** set `JOBOPS_LLM_PROVIDER` + the matching key
   for `batch_evaluate` / `evaluate_job mode="api"`. (Plain `mode="chat"` needs no key.)
 - **Cost.** When sampling *is* used it runs on the client's model, so the cost is **borne by
   the client**; `cost_estimate` records those calls flagged client-borne ($0 server cost).
 - Run the `doctor` tool to see the **live** state — it reports whether your current client
   advertised sampling or whether you're on the BYO-key path.
-- Set `MCP_JSA_SAMPLING=false` to force the BYO-key path even when sampling is available.
+- Set `JOBOPS_SAMPLING=false` to force the BYO-key path even when sampling is available.
 
 ## Frictionless profile setup (MCP elicitation)
 
@@ -268,7 +268,7 @@ which files are user-overridden vs bundled.
 Visa scoring is **fully optional**. Set:
 
 ```bash
-export MCP_JSA_VISA_SCORING=false
+export JOBOPS_VISA_SCORING=false
 ```
 
 When off:
@@ -294,21 +294,21 @@ roles where sponsorship is a non-issue — turn it off; the rest of the system w
 
 | Var | Default | Purpose |
 |---|---|---|
-| `MCP_JSA_PORT` | `7891` | HTTP port (MCP + file server + tracker dashboard) |
-| `MCP_JSA_HOST` | `127.0.0.1` | Bind host |
-| `MCP_JSA_PROJECT_ROOT` | cwd | Where `cv.md` / `config/profile.yml` / `portals.yml` live |
-| `MCP_JSA_DATA_DIR` | `<install>/data` | SQLite + WAL location |
-| `MCP_JSA_OUTPUT_DIR` | `<install>/output` | Rendered artifacts (PDFs, report HTML) |
-| `MCP_JSA_VISA_SCORING` | `true` | Set `false` to drop visa surface entirely (see above) |
-| `MCP_JSA_TEMPLATE_DIR` | _empty_ | User-owned dir holding additional resume/cover themes — overrides bundled themes of the same name. See [Custom themes](#custom-themes) + [`TEMPLATES.md`](./TEMPLATES.md). |
-| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` argument. |
-| `MCP_JSA_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
-| `MCP_JSA_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files/*`, and the dashboard. **Required** to bind to anything other than localhost — without it, a non-localhost bind refuses to start (default-deny). See [Security model](#security-model). |
-| `MCP_JSA_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **when the connected client advertises it** (most, incl. Claude Desktop, don't — then the BYO key is used). Set `false` to always use the BYO key. |
-| `MCP_JSA_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client doesn't support sampling (the common case): `gemini`, `deepseek`, `none` |
-| `MCP_JSA_LLM_MODEL` | _empty_ | Provider-specific model id |
+| `JOBOPS_PORT` | `7891` | HTTP port (MCP + file server + tracker dashboard) |
+| `JOBOPS_HOST` | `127.0.0.1` | Bind host |
+| `JOBOPS_PROJECT_ROOT` | cwd | Where `cv.md` / `config/profile.yml` / `portals.yml` live |
+| `JOBOPS_DATA_DIR` | `<install>/data` | SQLite + WAL location |
+| `JOBOPS_OUTPUT_DIR` | `<install>/output` | Rendered artifacts (PDFs, report HTML) |
+| `JOBOPS_VISA_SCORING` | `true` | Set `false` to drop visa surface entirely (see above) |
+| `JOBOPS_TEMPLATE_DIR` | _empty_ | User-owned dir holding additional resume/cover themes — overrides bundled themes of the same name. See [Custom themes](#custom-themes) + [`TEMPLATES.md`](./TEMPLATES.md). |
+| `JOBOPS_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` argument. |
+| `JOBOPS_PUBLIC_BASE_URL` | _empty_ | Public URL emitted in artifact links. Default: `http://127.0.0.1:<port>`. Set when running on a remote host (Tailscale, LAN, etc.) — see [Running on a remote host](#running-on-a-remote-host--tailscale). |
+| `JOBOPS_AUTH_TOKEN` | _empty_ | Bearer token gating `/mcp`, `/files/*`, and the dashboard. **Required** to bind to anything other than localhost — without it, a non-localhost bind refuses to start (default-deny). See [Security model](#security-model). |
+| `JOBOPS_SAMPLING` | `true` | Use MCP sampling for `api`/batch scoring **when the connected client advertises it** (most, incl. Claude Desktop, don't — then the BYO key is used). Set `false` to always use the BYO key. |
+| `JOBOPS_LLM_PROVIDER` | `gemini` | BYO-key path for `api`/batch scoring — used whenever the client doesn't support sampling (the common case): `gemini`, `deepseek`, `none` |
+| `JOBOPS_LLM_MODEL` | _empty_ | Provider-specific model id |
 | `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` | _empty_ | Provider credentials — needed for `api`/batch scoring unless your client supports MCP sampling (most don't; `mode="chat"` never needs a key) |
-| `MCP_JSA_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
+| `JOBOPS_SCHEDULER_ENABLED` | `false` | Whether opt-in cron runs at all |
 
 A working starter is at `.env.example`.
 
@@ -320,8 +320,8 @@ The recommended multi-client topology: **ONE long-running HTTP server = ONE sour
 truth.** Start it once, point every interface at it:
 
 ```bash
-npx job_ops-mcp start          # HTTP mode — serves MANY concurrent MCP clients
-npx job_ops-mcp connect        # prints ready-to-paste config for each client below
+npx jobops start          # HTTP mode — serves MANY concurrent MCP clients
+npx jobops connect        # prints ready-to-paste config for each client below
 ```
 
 All clients connect to the same `http://127.0.0.1:7891/mcp` (or a Tailscale host:port —
@@ -332,10 +332,10 @@ Rate-limited in one client? Switch to another — nothing is lost.
 
 | Client | Config (all printed by `connect`) |
 |---|---|
-| **Claude Code** | `claude mcp add --transport http job_ops-mcp <url>` or `.mcp.json` (`"type": "http"`) |
+| **Claude Code** | `claude mcp add --transport http jobops <url>` or `.mcp.json` (`"type": "http"`) |
 | **Claude Desktop** | `mcp-remote` bridge in `claude_desktop_config.json` (stdio→HTTP), or a paid-plan custom connector |
 | **opencode** | `opencode.json` → `"mcp": { … "type": "remote", "url": … }` |
-| **codex** | `~/.codex/config.toml` → `[mcp_servers.job_ops_mcp]` with `url` + `bearer_token_env_var` |
+| **codex** | `~/.codex/config.toml` → `[mcp_servers.jobops]` with `url` + `bearer_token_env_var` |
 | **gemini-cli** | `~/.gemini/settings.json` → `"httpUrl"` + `"headers"` |
 | **LibreChat** | `librechat.yaml` → `type: streamable-http` (see below for Docker) |
 | **Web UI / browser** | the tracker dashboard at `/` is the same server, same DB |
@@ -357,14 +357,14 @@ no per-client spawn, no port conflicts.
 Verify everything is wired to the same instance:
 
 ```bash
-npx job_ops-mcp status         # uptime, source-of-truth DB path + fingerprint,
+npx jobops status         # uptime, source-of-truth DB path + fingerprint,
                                # clients seen since boot (add --url / --token as needed)
 ```
 
 The `doctor` tool reports the same server-identity block from inside any chat client.
 
 **Auth:** the moment the server is reachable beyond localhost (Tailscale / LAN /
-always-on box), you **must** set `MCP_JSA_AUTH_TOKEN` — it serves PII (resume, contacts,
+always-on box), you **must** set `JOBOPS_AUTH_TOKEN` — it serves PII (resume, contacts,
 H1B data) to every connected endpoint, and it refuses to boot remotely without the
 token (see [Security model](#security-model)). The token then goes into each client's
 config; `connect` embeds it automatically when the env var is set.
@@ -377,19 +377,19 @@ config; `connect` embeds it automatically when the env var is set.
 rather than connecting to the shared one — fine when Claude Desktop is your only
 client. For the shared topology above, use the `mcp-remote` bridge that `connect`
 prints instead. (A stdio instance next to a running shared server also needs its own
-`MCP_JSA_PORT`, or the HTTP file server inside it fails with `EADDRINUSE`.)
+`JOBOPS_PORT`, or the HTTP file server inside it fails with `EADDRINUSE`.)
 
 Claude Desktop's local MCP only speaks **stdio**, not HTTP. Use the `--stdio` flag:
 
 ```jsonc
 {
   "mcpServers": {
-    "job_ops-mcp": {
+    "jobops": {
       "command": "npx",
-      "args": ["-y", "job_ops-mcp", "start", "--stdio"],
+      "args": ["-y", "jobops", "start", "--stdio"],
       "env": {
-        "MCP_JSA_PORT": "7891",
-        "MCP_JSA_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
+        "JOBOPS_PORT": "7891",
+        "JOBOPS_PROJECT_ROOT": "/absolute/path/to/your/job-search/dir"
       }
     }
   }
@@ -400,19 +400,19 @@ Claude Desktop's local MCP only speaks **stdio**, not HTTP. Use the `--stdio` fl
 `%APPDATA%/Claude/claude_desktop_config.json` on Windows. Restart Claude Desktop.)
 
 In `--stdio` mode the MCP transport rides stdin/stdout (which Claude Desktop drives via
-the `npx` spawn); the HTTP file server still binds to `MCP_JSA_PORT` in the background
+the `npx` spawn); the HTTP file server still binds to `JOBOPS_PORT` in the background
 so the `http://127.0.0.1:7891/files/*` links the server returns continue to resolve in
 your browser.
 
 Generic MCP clients that take a streamable-HTTP URL: skip the `--stdio` flag, run
-`npx job_ops-mcp start` in a terminal, and point your client at
+`npx jobops start` in a terminal, and point your client at
 `http://127.0.0.1:7891/mcp`.
 
-`npx job_ops-mcp connect` prints both blocks ready to paste.
+`npx jobops connect` prints both blocks ready to paste.
 
 ### LibreChat
 
-`npx job_ops-mcp connect` also prints a `librechat.yaml` block. Two shapes:
+`npx jobops connect` also prints a `librechat.yaml` block. Two shapes:
 
 - **LibreChat as a host process:** `type: streamable-http`, `url: http://127.0.0.1:7891/mcp`.
 - **LibreChat in Docker:** swap to `http://host.docker.internal:7891/mcp` AND allowlist
@@ -494,28 +494,28 @@ cloud instance, a homelab box, or anything you reach over Tailscale / LAN / a tu
 `127.0.0.1` on the link resolves to your *chat machine* — not the server — and the
 links don't work.
 
-Set `MCP_JSA_PUBLIC_BASE_URL` to the URL the chat machine actually uses to reach the
+Set `JOBOPS_PUBLIC_BASE_URL` to the URL the chat machine actually uses to reach the
 server:
 
 ```bash
 # Tailscale magic DNS
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
 
 # Tailscale 100.x IP
-export MCP_JSA_PUBLIC_BASE_URL="http://100.64.0.5:7891"
+export JOBOPS_PUBLIC_BASE_URL="http://100.64.0.5:7891"
 
 # LAN IP
-export MCP_JSA_PUBLIC_BASE_URL="http://192.168.1.20:7891"
+export JOBOPS_PUBLIC_BASE_URL="http://192.168.1.20:7891"
 
 # Reverse proxy
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.com"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.com"
 ```
 
 Every artifact link (resume PDF, .tex, .docx, eval report, apply_prefill screenshot,
-tracker URL) now uses that base. The server still binds to `MCP_JSA_HOST` (default
-`127.0.0.1`); to accept connections from other devices, also set `MCP_JSA_HOST=0.0.0.0`
-— **which now requires `MCP_JSA_AUTH_TOKEN`** (see [Security model](#security-model)).
-`npx job_ops-mcp doctor` prints the effective public base URL and auth posture.
+tracker URL) now uses that base. The server still binds to `JOBOPS_HOST` (default
+`127.0.0.1`); to accept connections from other devices, also set `JOBOPS_HOST=0.0.0.0`
+— **which now requires `JOBOPS_AUTH_TOKEN`** (see [Security model](#security-model)).
+`npx jobops doctor` prints the effective public base URL and auth posture.
 
 A malformed value (e.g. `not-a-url`) is rejected at boot with a warning on stderr; the
 server keeps running with the default 127.0.0.1 base. Trailing slashes are stripped.
@@ -528,7 +528,7 @@ This server handles **PII**: your resume PDFs, cover letters, eval reports, your
 LinkedIn connections, and H1B-derived employer data. The auth posture is decided entirely
 by **where you bind** and **whether a token is set**:
 
-| Bind (`MCP_JSA_HOST`) | `MCP_JSA_AUTH_TOKEN` | Result |
+| Bind (`JOBOPS_HOST`) | `JOBOPS_AUTH_TOKEN` | Result |
 |---|---|---|
 | `127.0.0.1` (default) | unset | **Open** — frictionless local use. PII stays on loopback. |
 | `127.0.0.1` | set | **Token required** — bearer auth enforced even locally (opt-in). |
@@ -546,10 +546,10 @@ authorization-server flow.
 
 ```bash
 # Expose over Tailscale/LAN — generate a strong token first.
-export MCP_JSA_HOST=0.0.0.0
-export MCP_JSA_AUTH_TOKEN="$(openssl rand -hex 32)"
-export MCP_JSA_PUBLIC_BASE_URL="https://jobs.example.ts.net"
-npx job_ops-mcp start
+export JOBOPS_HOST=0.0.0.0
+export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"
+export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
+npx jobops start
 ```
 
 **What's protected:** `/mcp`, `/files/*`, `/`. **What's open by design:** `/healthz`
@@ -616,21 +616,21 @@ mkdir -p ~/job-themes/compact
 # Each theme file is a plain template with {{PLACEHOLDER}} slots — see
 # TEMPLATES.md for the full placeholder contract.
 
-export MCP_JSA_TEMPLATE_DIR=~/job-themes
-npx job_ops-mcp templates             # lists bundled + user themes
+export JOBOPS_TEMPLATE_DIR=~/job-themes
+npx jobops templates             # lists bundled + user themes
 
 # Then in your MCP chat:
 # render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact" cover_body="..."
 ```
 
-The loader checks `$MCP_JSA_TEMPLATE_DIR` **first**, so a `default/` directory
-inside your themes dir overrides the bundled default. Set `MCP_JSA_DEFAULT_TEMPLATE`
+The loader checks `$JOBOPS_TEMPLATE_DIR` **first**, so a `default/` directory
+inside your themes dir overrides the bundled default. Set `JOBOPS_DEFAULT_TEMPLATE`
 to make a non-`default` theme the implicit default for every call.
 
 | Env var | Default | What it does |
 |---------|---------|--------------|
-| `MCP_JSA_TEMPLATE_DIR` | _empty_ | Extra dir holding your custom themes (one subdir per theme). |
-| `MCP_JSA_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` arg. |
+| `JOBOPS_TEMPLATE_DIR` | _empty_ | Extra dir holding your custom themes (one subdir per theme). |
+| `JOBOPS_DEFAULT_TEMPLATE` | `default` | Theme used when `render_pdf` has no explicit `template` arg. |
 
 A custom theme that omits a placeholder degrades gracefully (the section is dropped,
 the renderer does not crash). In `.tex` themes, commenting a placeholder out
@@ -725,7 +725,7 @@ import_h1b path="/absolute/path/to/LCA_Disclosure_Data_FY2025_Q1.csv"
 none`) computed from filings count + recency. **Internal only** — never surfaced in any
 resume, cover letter, or outreach (see the visa hard rule).
 
-If you disabled visa scoring (`MCP_JSA_VISA_SCORING=false`), these tools don't appear in
+If you disabled visa scoring (`JOBOPS_VISA_SCORING=false`), these tools don't appear in
 `tools/list` at all.
 
 ### Scheduler (opt-in cron)
@@ -760,7 +760,7 @@ Job cadence is fixed (4h / 30m / hourly with an 8AM digest window). Toggle off w
 ## Layout
 
 ```
-job_ops-mcp/
+jobops/
 ├── modes/                     # MCP resources (edit me to tune the brain)
 ├── templates/                 # CV HTML/LaTeX templates + cover-letter template
 ├── fonts/                     # Space Grotesk, DM Sans (woff2 subsets)
@@ -837,7 +837,7 @@ That tag push triggers `publish.yml`, which:
    the tarball.
 
 Watch progress in the repo's **Actions** tab. On success the new version appears on
-[npmjs.com/package/job_ops-mcp](https://www.npmjs.com/package/job_ops-mcp).
+[npmjs.com/package/jobops](https://www.npmjs.com/package/jobops).
 
 ## Contributing / feedback
 

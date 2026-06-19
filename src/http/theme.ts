@@ -15,9 +15,9 @@
 //                          flips the attribute + writes to localStorage. No framework.
 //
 // The toggle state is shared across dashboard + reports because both pages read the same
-// localStorage key (`job_ops-mcp-theme`) on load.
+// localStorage key (`jobops-theme`) on load.
 
-const STORAGE_KEY = 'job_ops-mcp-theme';
+const STORAGE_KEY = 'jobops-theme';
 
 /** Goes into <head> BEFORE styles. Runs synchronously to set the attribute pre-paint. */
 export function themeInitScript(): string {

@@ -9,7 +9,7 @@
 //      user can verify all clients hit the same instance.
 //
 // One Express app on one ephemeral port serves every "client" here — exactly the
-// production shape of `npx jobops start` (no per-client spawn, no EADDRINUSE).
+// production shape of `npx @mohith_das/jobops start` (no per-client spawn, no EADDRINUSE).
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

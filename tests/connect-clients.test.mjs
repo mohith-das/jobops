@@ -78,5 +78,5 @@ test('status command points at a non-running server → clear failure', () => {
   });
   assert.equal(r.status, 1);
   assert.match(r.stdout, /No server reachable/);
-  assert.match(r.stdout, /npx jobops start/);
+  assert.match(r.stdout, /npx @mohith_das\/jobops start/);
 });

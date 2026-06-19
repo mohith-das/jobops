@@ -320,7 +320,7 @@ One process. Three planes. Six MCP resources and 51 tools. In HTTP mode that one
 No external Postgres. No n8n. No cloud anything. The single-process design means:
 
 \begin{itemize}
-\item \textbf{Boot in 2 seconds.} \cmd{npx jobops start} \textemdash{} no docker compose, no migrations to run by hand, no init container.
+\item \textbf{Boot in 2 seconds.} \cmd{npx @mohith\_das/jobops start} \textemdash{} no docker compose, no migrations to run by hand, no init container.
 \item \textbf{Local data, local artifacts.} Your jobs, your scores, your LinkedIn export, your H1B import, your tailored PDFs all live next to your \fpath{cv.md} in one directory. Back it up by copying that directory.
 \item \textbf{Chat-driven, not autonomous.} The server reacts to chat tool calls. It is not a background daemon scraping the web.
 \item \textbf{Opt-in cron.} If you do want background scans, \tool{scheduler\_enable} turns on a per-job interval. Off by default.
@@ -342,23 +342,23 @@ No external Postgres. No n8n. No cloud anything. The single-process design means
 \begin{lstlisting}[language=bashplus]
 # 1. Scaffold cv.md, config/profile.yml, portals.yml in the current directory
 #    and create the SQLite database. Idempotent --- safe to re-run.
-npx jobops init
+npx @mohith_das/jobops init
 
 # 2. Edit the three files. Replace every <TODO> placeholder.
 
 # 3. Rebuild the career_packet from your now-real cv.md. (Or just re-run
 #    `init` --- it auto-reseeds when it detects cv.md changed.)
-npx jobops reseed
+npx @mohith_das/jobops reseed
 
 # 4. Confirm everything is wired.
-npx jobops doctor
+npx @mohith_das/jobops doctor
 
 # 5. Boot the server. Chromium auto-installs on first run (~150 MB, one-time).
-npx jobops start
+npx @mohith_das/jobops start
 \end{lstlisting}
 
 \begin{tipbox}
-The CLI is also published as the dual alias \cmd{npx jobops} (hyphen-only). They are the same binary \textemdash{} use whichever your fingers prefer.
+The package is scoped (\cmd{@mohith\_das/jobops}) but the installed command is just \cmd{jobops} \textemdash{} once it's on your \texttt{PATH} (global install) you can drop the \cmd{npx @mohith\_das/jobops} prefix and run \cmd{jobops start}, \cmd{jobops doctor}, etc. directly.
 \end{tipbox}
 
 \begin{tipbox}[Editing the packet — two safe directions]
@@ -385,7 +385,7 @@ Section 9, which reseed always preserves. A self-contained operator reference sh
 
 \subsection*{What \tool{init} creates}
 
-After \cmd{npx jobops init} from a clean directory you'll have:
+After \cmd{npx @mohith\_das/jobops init} from a clean directory you'll have:
 
 \begin{lstlisting}
 my-job-search/
@@ -439,11 +439,11 @@ All optional. Defaults in parens.
 
 \subsection*{Connecting your chat client(s): one server, every client}
 
-The recommended topology is \textbf{ONE long-running HTTP server = ONE source of truth}. Run \cmd{npx jobops start} once (locally, or on an always-on host over Tailscale) and point \emph{every} interface at the same \texttt{http://127.0.0.1:7891/mcp} endpoint: Claude Code (\cmd{claude mcp add --transport http}), Claude Desktop (via the \texttt{mcp-remote} stdio\textrightarrow{}HTTP bridge, or a paid-plan custom connector), opencode (\fpath{opencode.json}, \texttt{type: remote}), codex (\fpath{\textasciitilde/.codex/config.toml}, \texttt{url} + \texttt{bearer\_token\_env\_var}), gemini-cli (\fpath{settings.json}, \texttt{httpUrl}), LibreChat (\texttt{streamable-http}), and the tracker web UI. Because there is exactly one process and one SQLite DB behind all of them, materials, tracker moves, contacts, and packet edits made in any client are instantly visible in all the others \textemdash{} when one client is rate-limited, switch to another and continue where you left off.
+The recommended topology is \textbf{ONE long-running HTTP server = ONE source of truth}. Run \cmd{npx @mohith\_das/jobops start} once (locally, or on an always-on host over Tailscale) and point \emph{every} interface at the same \texttt{http://127.0.0.1:7891/mcp} endpoint: Claude Code (\cmd{claude mcp add --transport http}), Claude Desktop (via the \texttt{mcp-remote} stdio\textrightarrow{}HTTP bridge, or a paid-plan custom connector), opencode (\fpath{opencode.json}, \texttt{type: remote}), codex (\fpath{\textasciitilde/.codex/config.toml}, \texttt{url} + \texttt{bearer\_token\_env\_var}), gemini-cli (\fpath{settings.json}, \texttt{httpUrl}), LibreChat (\texttt{streamable-http}), and the tracker web UI. Because there is exactly one process and one SQLite DB behind all of them, materials, tracker moves, contacts, and packet edits made in any client are instantly visible in all the others \textemdash{} when one client is rate-limited, switch to another and continue where you left off.
 
-\cmd{npx jobops connect} prints copy-paste-ready config for each of those clients (flags: \flag{--host}, \flag{--port}, \flag{--token}). Concurrency is safe by design: every HTTP request gets an isolated MCP protocol instance, reads run concurrently (SQLite WAL), and all writes are serialized through one write lock in the single server process \textemdash{} no per-client spawn, no port conflicts, no corruption under multi-client load.
+\cmd{npx @mohith\_das/jobops connect} prints copy-paste-ready config for each of those clients (flags: \flag{--host}, \flag{--port}, \flag{--token}). Concurrency is safe by design: every HTTP request gets an isolated MCP protocol instance, reads run concurrently (SQLite WAL), and all writes are serialized through one write lock in the single server process \textemdash{} no per-client spawn, no port conflicts, no corruption under multi-client load.
 
-Verify all clients hit the same instance with \cmd{npx jobops status} (flags: \flag{--url}, \flag{--token}): it reports uptime, the source-of-truth DB path + a short fingerprint, and which MCP clients have connected since boot. The \tool{doctor} tool reports the same server-identity block from inside any chat.
+Verify all clients hit the same instance with \cmd{npx @mohith\_das/jobops status} (flags: \flag{--url}, \flag{--token}): it reports uptime, the source-of-truth DB path + a short fingerprint, and which MCP clients have connected since boot. The \tool{doctor} tool reports the same server-identity block from inside any chat.
 
 \textbf{Auth:} the moment the server is reachable beyond localhost it MUST run with \env{JOBOPS\_AUTH\_TOKEN} set (\S\ref{sec:security}) \textemdash{} it serves PII to every connected endpoint and refuses to boot remotely without the token. The token goes into each client's config; \cmd{connect} embeds it automatically when the env var is set.
 
@@ -489,7 +489,7 @@ mcpServers:
     timeout: 60000
 \end{lstlisting}
 
-Boot the server separately (\cmd{npx jobops start}), then restart LibreChat.
+Boot the server separately (\cmd{npx @mohith\_das/jobops start}), then restart LibreChat.
 
 \subsubsection*{LibreChat (Docker)}
 
@@ -541,7 +541,7 @@ export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.com"
 Every artifact link (resume PDF, .tex, .docx, eval report, apply\_prefill screenshot,
 tracker URL) now uses that base. No other behaviour changes \textemdash{} the server still
 binds to \env{JOBOPS\_HOST} (default \texttt{127.0.0.1}); to accept connections from other
-devices, also set \env{JOBOPS\_HOST=0.0.0.0}. \cmd{npx jobops doctor} prints the
+devices, also set \env{JOBOPS\_HOST=0.0.0.0}. \cmd{npx @mohith\_das/jobops doctor} prints the
 effective public base URL so you can confirm what your links will look like. A malformed
 value is rejected at boot with a warning on stderr; the server keeps running with the
 default 127.0.0.1 base. Trailing slashes are stripped.
@@ -1192,7 +1192,7 @@ taglines:
   "Forward-Deployed":    "embeds with customers and closes the deal"
 \end{lstlisting}
 
-On the next \texttt{reseed} (CLI \texttt{npx jobops reseed} or the \tool{reseed\_career\_packet} tool) these auto-populate Section 2 \textemdash{} one bullet per archetype. The field is backwards-compatible: omit it entirely and Section 2 keeps the editable template placeholders exactly as before.
+On the next \texttt{reseed} (CLI \texttt{npx @mohith\_das/jobops reseed} or the \tool{reseed\_career\_packet} tool) these auto-populate Section 2 \textemdash{} one bullet per archetype. The field is backwards-compatible: omit it entirely and Section 2 keeps the editable template placeholders exactly as before.
 
 \subsection*{Company alias / fuzzy matching}
 
@@ -1275,7 +1275,7 @@ mkdir -p ~/job-themes/compact
 # bundled default as a starting point and edit the preamble or layout.
 
 export JOBOPS_TEMPLATE_DIR=~/job-themes
-npx jobops templates             # lists bundled + user themes
+npx @mohith_das/jobops templates             # lists bundled + user themes
 
 # Then in your MCP chat, pass template= to render_pdf:
 #   render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact"
@@ -1344,7 +1344,7 @@ When a token is required, \texttt{/mcp}, \texttt{/files/*}, and the dashboard (\
 export JOBOPS_HOST=0.0.0.0
 export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"
 export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
-npx jobops start
+npx @mohith_das/jobops start
 \end{lstlisting}
 
 \textbf{Protected:} \texttt{/mcp}, \texttt{/files/*}, \texttt{/}. \textbf{Open by design:} \texttt{/healthz} (liveness, no PII) and the discovery metadata. The URL-mode elicitation capture form (\texttt{/elicit/:id}) is gated by an unguessable one-time id rather than the bearer token, so you can complete it in a browser. \textbf{Hard rule:} PII must never be served unauthenticated to a network \textemdash{} the default-deny boot guard makes a missing token fail loudly instead of silently exposing your data. Even with a token, prefer a private network (Tailscale / VPN / authenticated reverse proxy) over the public internet.
@@ -1406,9 +1406,9 @@ A failing draft is returned to the chat with the specific rule + offending hit s
 \subsection*{Setup issues}
 
 \begin{description}
-\item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx jobops start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
+\item[\textit{``Chromium isn't installed''} on first \texttt{start}] \texttt{npx @mohith\_das/jobops start} auto-installs Chromium on first run (~150 MB, ~30 s). If you skipped it via \cmd{--skip-chromium-check} or the install errored, run \cmd{npx playwright install chromium} manually and re-try.
 
-\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline with the \flag{--stdio} flag; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx jobops doctor} to confirm.
+\item[\textit{``Tool not found''} from the chat client] Your client connected before the server had registered tools. Check the connection mode \textemdash{} for Claude Desktop, the \texttt{command: npx} block should spawn the server inline with the \flag{--stdio} flag; for LibreChat, the server must already be running on the URL you specified. Run \cmd{npx @mohith\_das/jobops doctor} to confirm.
 
 \item[\textit{LibreChat shows ``connected'' but every call fails}] You're in Docker, the LibreChat container can't reach your host's \texttt{127.0.0.1}. Swap to \texttt{host.docker.internal} \textbf{and} add the entry to \texttt{mcpSettings.allowedAddresses}. On Linux, add \texttt{extra\_hosts:\ ["host.docker.internal:host-gateway"]} to docker-compose.yml.
 

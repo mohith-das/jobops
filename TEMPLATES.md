@@ -27,7 +27,7 @@ This guide is the reference for the placeholder contract a theme must satisfy.
 4. List what the loader sees:
 
    ```bash
-   npx jobops templates
+   npx @mohith_das/jobops templates
    ```
 
 5. Render with it:

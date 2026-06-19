@@ -6,7 +6,7 @@
 // process owns. Surfaced three ways, all read-only:
 //   - GET /api/status            (auth-gated JSON — the CLI `status` command hits this)
 //   - the `doctor` MCP tool      (a "Server" check row in server context)
-//   - `npx jobops status`   (CLI, queries a RUNNING server over HTTP)
+//   - `npx @mohith_das/jobops status`   (CLI, queries a RUNNING server over HTTP)
 //
 // The point: a user running several clients (Claude Desktop, Claude Code,
 // opencode, codex, …) against one server can VERIFY they all hit the same

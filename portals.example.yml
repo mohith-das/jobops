@@ -1,6 +1,6 @@
 # jobops portals configuration.
 #
-# Copy to `portals.yml` (or let `npx jobops init` do it) and fill in the companies
+# Copy to `portals.yml` (or let `npx @mohith_das/jobops init` do it) and fill in the companies
 # whose careers boards you want to scan. Three provider auto-detectors run against
 # `careers_url`:
 #

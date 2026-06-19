@@ -1,9 +1,9 @@
 // Entrypoint. One process, two transport modes:
 //
-//   HTTP   (default)   — npx jobops start
+//   HTTP   (default)   — npx @mohith_das/jobops start
 //     MCP transport + file server + tracker dashboard, all on JOBOPS_PORT.
 //
-//   stdio  (Claude Desktop)  — npx jobops start --stdio
+//   stdio  (Claude Desktop)  — npx @mohith_das/jobops start --stdio
 //     MCP transport on stdin/stdout; HTTP file server still runs on the port
 //     so /files/* artifact links the chat returns still resolve in a browser.
 //

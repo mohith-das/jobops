@@ -51,8 +51,8 @@ instantly visible in all others. Safety model: each HTTP request gets a **fresh 
 protocol instance** (`src/mcp/server.ts` — a shared instance would cross-route responses
 between overlapping clients); reads run concurrently under WAL; **all writes serialize
 through `runInWriteLock`** in the single process; `busy_timeout=5000` covers a second
-*process* on the same DB file (e.g. a stdio instance). `npx jobops connect` prints
-per-client config; `npx jobops status` (or the `doctor` tool) verifies uptime, the
+*process* on the same DB file (e.g. a stdio instance). `npx @mohith_das/jobops connect` prints
+per-client config; `npx @mohith_das/jobops status` (or the `doctor` tool) verifies uptime, the
 source-of-truth DB path + fingerprint, and which clients have connected. Beyond localhost,
 `JOBOPS_AUTH_TOKEN` is mandatory (default-deny) and goes into every client's config.
 stdio mode stays available as the single-client alternative (private process; needs its
@@ -209,7 +209,7 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
   write `profile.yml`, and reseed in one step (see §8).
 - `cost_estimate` — LLM spend per provider/model/tool over a window (flags sampling as
   client-borne $0).
-- `doctor` — **read-only health report** (same checks as the `npx jobops doctor` CLI):
+- `doctor` — **read-only health report** (same checks as the `npx @mohith_das/jobops doctor` CLI):
   packet ↔ cv.md sync state (incl. chat-edited / cv-edited-after-reseed), LLM provider+key,
   sampling + auth posture, active template, modes (bundled vs overridden), visa scoring,
   public base URL, Chromium, Node, config files. Returns structured `{ ok, counts, checks[],
@@ -256,7 +256,7 @@ Most reasoning tools take `mode: "chat"` (default, no key) or `mode: "api"` (ser
 
 ```bash
 # 1. Scaffold cv.md, config/profile.yml, portals.yml, modes/*.md + the SQLite DB
-npx jobops@latest init        # idempotent; never overwrites edited files
+npx @mohith_das/jobops@latest init        # idempotent; never overwrites edited files
 
 # 2. Edit the three source files — replace every <TODO> placeholder:
 #    cv.md            → your experience, projects, skills, education
@@ -265,13 +265,13 @@ npx jobops@latest init        # idempotent; never overwrites edited files
 #    (optional) modes/*.md → tune rubric / tailoring / tone
 
 # 3. Rebuild the career packet from your now-real cv.md + profile.yml
-npx jobops@latest reseed
+npx @mohith_das/jobops@latest reseed
 
 # 4. Confirm wiring (Node, Chromium, files, modes, auth, scoring backend, packet freshness)
-npx jobops@latest doctor
+npx @mohith_das/jobops@latest doctor
 
 # 5. Boot (HTTP). Chromium auto-installs on first run.
-npx jobops@latest start
+npx @mohith_das/jobops@latest start
 ```
 
 CLI commands: `init`, `start`, `start --stdio`, `reseed`, `templates`, `doctor`, `connect`
@@ -287,7 +287,7 @@ source-of-truth DB + fingerprint, clients seen; flags `--url --token`), `help`, 
   "mcpServers": {
     "jobops": {
       "command": "npx",
-      "args": ["-y", "jobops@0.8.0", "start", "--stdio"],
+      "args": ["-y", "@mohith_das/jobops@0.8.0", "start", "--stdio"],
       "env": {
         "JOBOPS_PORT": "7891",
         "JOBOPS_PROJECT_ROOT": "/absolute/path/to/your/job-search-dir"
@@ -341,7 +341,7 @@ repo for the full placeholder contract, e.g. `{{HEADER}}`, `{{EXPERIENCE}}`,
 mkdir -p ~/job-themes/mytheme        # author resume.tex/cover.tex/resume.html/cover.html
 export JOBOPS_TEMPLATE_DIR=~/job-themes
 export JOBOPS_DEFAULT_TEMPLATE=mytheme    # or pass template="mytheme" to render_pdf
-npx jobops templates            # lists bundled + user themes; marks the default
+npx @mohith_das/jobops templates            # lists bundled + user themes; marks the default
 ```
 The loader checks `JOBOPS_TEMPLATE_DIR` first, so a `default/` folder there overrides the
 bundled default; brand-new themes are also picked up. A theme missing a placeholder drops
@@ -452,13 +452,13 @@ no exclamation marks, no clichés. A failing draft is returned with the offendin
   Node-24-installed mcp-remote in the client config). Affects ANY streamable-HTTP server
   behind mcp-remote, which is how to tell it apart from a real server issue.
 - **`doctor` says "cv.md was edited after the last reseed"** — your packet is stale. Run
-  `reseed` (CLI `npx jobops reseed`, or the `reseed_career_packet` tool).
+  `reseed` (CLI `npx @mohith_das/jobops reseed`, or the `reseed_career_packet` tool).
 - **`doctor` fails on config files / wrong directory** — `doctor`/`start` resolve files from
   `JOBOPS_PROJECT_ROOT` (default = current working dir). Run from your job-search dir, or
   set `JOBOPS_PROJECT_ROOT` to its absolute path (do this in the Claude Desktop env block).
 - **Stale version via npx** — `npx` caches by version and reuses it. Pin an explicit version
-  in your client config (`jobops@0.8.0`); to force-refresh a bare invocation,
-  `rm -rf ~/.npm/_npx` then `npx jobops@latest ...`. Confirm with `--version` / `doctor`.
+  in your client config (`@mohith_das/jobops@0.8.0`); to force-refresh a bare invocation,
+  `rm -rf ~/.npm/_npx` then `npx @mohith_das/jobops@latest ...`. Confirm with `--version` / `doctor`.
 - **Sampling/elicitation "not working"** — they require a **stdio** client (Claude Desktop).
   Over HTTP they gate off by design; configure a BYO key, or use chat mode.
 - **Tool list looks short** — visa tools are hidden when `JOBOPS_VISA_SCORING=false`; that's

@@ -4,7 +4,7 @@ This file is the **active career packet** — the superset of every claim the ca
 allowed to make. `generate_materials(job_id)` picks subsets from this per JD; it never
 invents claims outside this set.
 
-When you run `npx jobops init` the server seeds this from your `cv.md` +
+When you run `npx @mohith_das/jobops init` the server seeds this from your `cv.md` +
 `config/profile.yml` and stores versioned copies in the `career_packet` table. Re-edit
 `cv.md`, then call the `update_career_packet` MCP tool to bump a new version.
 

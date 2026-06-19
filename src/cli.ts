@@ -134,9 +134,9 @@ async function cmdInit(flags: Map<string, string | boolean>) {
     } else if (status === 'packet_chat_edited') {
       console.log(`  ${tick()} active packet is chat-edited (ahead of cv.md) — left intact. ${c.dim('reseed will not overwrite it without --force.')}`);
     } else if (status === 'cv_is_example') {
-      console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx jobops reseed')}.`);
+      console.log(`  ${warn()} cv.md still looks like the example template — fill it in, then run ${c.bold('npx @mohith_das/jobops reseed')}.`);
     } else if (status === 'packet_is_template') {
-      console.log(`  ${warn()} active packet still has TODO markers. Run ${c.bold('npx jobops reseed')} to rebuild from cv.md.`);
+      console.log(`  ${warn()} active packet still has TODO markers. Run ${c.bold('npx @mohith_das/jobops reseed')} to rebuild from cv.md.`);
     }
   } catch (e: any) {
     console.log(`  ${cross()} migration error: ${e?.message ?? e}`);
@@ -146,9 +146,9 @@ async function cmdInit(flags: Map<string, string | boolean>) {
   console.log(c.bold('\nNext steps:'));
   console.log(`  1. Edit ${c.bold('cv.md')}, ${c.bold('config/profile.yml')}, and ${c.bold('portals.yml')} — replace every <TODO> placeholder.`);
   console.log(`     ${c.dim('Optional: tune the behavior in modes/*.md (rubric, tailoring rules, outreach tone) — your edits win over the bundled defaults.')}`);
-  console.log(`  2. Run ${c.bold('npx jobops doctor')} to confirm everything is wired.`);
-  console.log(`  3. Run ${c.bold('npx jobops start')} to boot the server.`);
-  console.log(`  4. Run ${c.bold('npx jobops connect')} for Claude Desktop config.\n`);
+  console.log(`  2. Run ${c.bold('npx @mohith_das/jobops doctor')} to confirm everything is wired.`);
+  console.log(`  3. Run ${c.bold('npx @mohith_das/jobops start')} to boot the server.`);
+  console.log(`  4. Run ${c.bold('npx @mohith_das/jobops connect')} for Claude Desktop config.\n`);
 
   if (scaffolded === 0 && kept > 0) {
     console.log(c.dim('(All example files already present; init is idempotent — re-run safe.)'));
@@ -231,7 +231,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
 
   console.log(c.bold(`\njobops connect — one server, every client\n`));
   console.log(`Recommended topology: ${c.bold('ONE long-running server = ONE source of truth.')}`);
-  console.log(`  Start it once:           ${c.bold('npx jobops start')}   ${c.dim('(HTTP mode — serves many concurrent clients)')}`);
+  console.log(`  Start it once:           ${c.bold('npx @mohith_das/jobops start')}   ${c.dim('(HTTP mode — serves many concurrent clients)')}`);
   console.log(`  Every client connects to: ${c.bold(url)}`);
   console.log(c.dim(
     '  Work done in ANY client (materials, tracker, contacts, packet edits) is instantly\n' +
@@ -393,7 +393,7 @@ async function cmdConnect(flags: Map<string, string | boolean>) {
     },
   }, null, 2));
 
-  console.log(c.dim(`\nVerify any client is hitting the shared instance:  npx jobops status${token ? ' --token <token>' : ''}\n`));
+  console.log(c.dim(`\nVerify any client is hitting the shared instance:  npx @mohith_das/jobops status${token ? ' --token <token>' : ''}\n`));
 }
 
 // ── status ──────────────────────────────────────────────────────────────────
@@ -415,8 +415,8 @@ async function cmdStatus(flags: Map<string, string | boolean>) {
     health = await r.json();
   } catch (e: any) {
     console.log(`${cross()} No server reachable at ${base} (${e?.cause?.code ?? e?.message ?? e})`);
-    console.log(c.dim('   Start the shared server with:  npx jobops start'));
-    console.log(c.dim('   Or point this check elsewhere: npx jobops status --url http://host:7891\n'));
+    console.log(c.dim('   Start the shared server with:  npx @mohith_das/jobops start'));
+    console.log(c.dim('   Or point this check elsewhere: npx @mohith_das/jobops status --url http://host:7891\n'));
     process.exit(1);
   }
   console.log(`${tick()} Server reachable (auth: ${health.auth})`);
@@ -425,7 +425,7 @@ async function cmdStatus(flags: Map<string, string | boolean>) {
   const r = await fetch(`${base}/api/status`, { headers });
   if (r.status === 401) {
     console.log(`${cross()} /api/status requires the bearer token (server runs with auth enabled).`);
-    console.log(c.dim('   Pass it:  npx jobops status --token <token>   (or export JOBOPS_AUTH_TOKEN)\n'));
+    console.log(c.dim('   Pass it:  npx @mohith_das/jobops status --token <token>   (or export JOBOPS_AUTH_TOKEN)\n'));
     process.exit(1);
   }
   if (!r.ok) {
@@ -543,7 +543,7 @@ async function cmdReseed(flags: Map<string, string | boolean>) {
   const { cvMd, profile } = loadProjectFiles();
 
   if (!profile && !flags.get('force')) {
-    console.error(`  ${cross()} config/profile.yml not found. Run ${c.bold('npx jobops init')} first, or pass --force.`);
+    console.error(`  ${cross()} config/profile.yml not found. Run ${c.bold('npx @mohith_das/jobops init')} first, or pass --force.`);
     process.exit(1);
   }
   if (!cvHasRealContent(cvMd) && !flags.get('force')) {
@@ -580,7 +580,7 @@ function cmdHelp() {
 ${c.bold('jobops')} — self-hosted MCP server for an end-to-end job search pipeline.
 
 USAGE
-  npx jobops <command> [flags]
+  npx @mohith_das/jobops <command> [flags]
 
 COMMANDS
   init              Scaffold cv.md / config/profile.yml / portals.yml from examples

@@ -16,24 +16,24 @@ back as an `http://localhost:7891/...` link.
 
 ```bash
 # 1. Scaffold your working directory (cv.md, profile.yml, portals.yml, modes/*.md + SQLite DB)
-npx jobops init
+npx @mohith_das/jobops init
 
 # 2. Open cv.md, config/profile.yml, portals.yml and replace every <TODO> placeholder.
 #    (Optional: tune modes/*.md — rubric, tailoring rules, outreach tone — your edits win.)
 
 # 3. Rebuild the career_packet from your now-real cv.md
 #    (or just re-run `init` — it auto-reseeds when it detects cv.md changed)
-npx jobops reseed
+npx @mohith_das/jobops reseed
 
 # 4. Confirm everything is wired
-npx jobops doctor
+npx @mohith_das/jobops doctor
 
 # 5. Boot the server (Chromium auto-installs on first run)
-npx jobops start
+npx @mohith_das/jobops start
 #  ▷ jobops listening on http://127.0.0.1:7891
 
 # 6. Get a copy-paste config block for your MCP client
-npx jobops connect
+npx @mohith_das/jobops connect
 
 # 7. Paste a job URL or pasted JD into your chat — the chat calls evaluate_job, draws on
 #    your rubric + career_packet + tailoring rules, and walks the rest of the workflow.
@@ -70,8 +70,8 @@ and brings any prior version back (restore is itself reversible).
 `config/profile.yml`, then **reseed** to rebuild the packet from them:
 
 ```bash
-npx jobops reseed            # safe: refuses if the packet has chat edits not in cv.md
-npx jobops reseed --force    # rebuild from cv.md anyway (drops chat edits)
+npx @mohith_das/jobops reseed            # safe: refuses if the packet has chat edits not in cv.md
+npx @mohith_das/jobops reseed --force    # rebuild from cv.md anyway (drops chat edits)
 ```
 
 **Bringing the two back in sync.** When you've been editing in chat and want `cv.md` to
@@ -137,7 +137,7 @@ tailoring_rules, outreach_tone, negotiation_playbook, career_packet — all load
 `modes/*.md` and live-reloaded on edit. Tune scoring or tone without touching code.
 
 > **Tip:** ask the chat to run **`doctor`** anytime — it's a read-only health report (same
-> checks as the `npx jobops doctor` CLI command) covering packet ↔ cv.md sync state,
+> checks as the `npx @mohith_das/jobops doctor` CLI command) covering packet ↔ cv.md sync state,
 > LLM provider/key, sampling + auth posture, active template, modes, visa scoring, and the
 > public base URL. Handy for "is my server wired right?" without leaving chat.
 
@@ -320,8 +320,8 @@ The recommended multi-client topology: **ONE long-running HTTP server = ONE sour
 truth.** Start it once, point every interface at it:
 
 ```bash
-npx jobops start          # HTTP mode — serves MANY concurrent MCP clients
-npx jobops connect        # prints ready-to-paste config for each client below
+npx @mohith_das/jobops start          # HTTP mode — serves MANY concurrent MCP clients
+npx @mohith_das/jobops connect        # prints ready-to-paste config for each client below
 ```
 
 All clients connect to the same `http://127.0.0.1:7891/mcp` (or a Tailscale host:port —
@@ -357,7 +357,7 @@ no per-client spawn, no port conflicts.
 Verify everything is wired to the same instance:
 
 ```bash
-npx jobops status         # uptime, source-of-truth DB path + fingerprint,
+npx @mohith_das/jobops status         # uptime, source-of-truth DB path + fingerprint,
                                # clients seen since boot (add --url / --token as needed)
 ```
 
@@ -405,14 +405,14 @@ so the `http://127.0.0.1:7891/files/*` links the server returns continue to reso
 your browser.
 
 Generic MCP clients that take a streamable-HTTP URL: skip the `--stdio` flag, run
-`npx jobops start` in a terminal, and point your client at
+`npx @mohith_das/jobops start` in a terminal, and point your client at
 `http://127.0.0.1:7891/mcp`.
 
-`npx jobops connect` prints both blocks ready to paste.
+`npx @mohith_das/jobops connect` prints both blocks ready to paste.
 
 ### LibreChat
 
-`npx jobops connect` also prints a `librechat.yaml` block. Two shapes:
+`npx @mohith_das/jobops connect` also prints a `librechat.yaml` block. Two shapes:
 
 - **LibreChat as a host process:** `type: streamable-http`, `url: http://127.0.0.1:7891/mcp`.
 - **LibreChat in Docker:** swap to `http://host.docker.internal:7891/mcp` AND allowlist
@@ -515,7 +515,7 @@ Every artifact link (resume PDF, .tex, .docx, eval report, apply_prefill screens
 tracker URL) now uses that base. The server still binds to `JOBOPS_HOST` (default
 `127.0.0.1`); to accept connections from other devices, also set `JOBOPS_HOST=0.0.0.0`
 — **which now requires `JOBOPS_AUTH_TOKEN`** (see [Security model](#security-model)).
-`npx jobops doctor` prints the effective public base URL and auth posture.
+`npx @mohith_das/jobops doctor` prints the effective public base URL and auth posture.
 
 A malformed value (e.g. `not-a-url`) is rejected at boot with a warning on stderr; the
 server keeps running with the default 127.0.0.1 base. Trailing slashes are stripped.
@@ -549,7 +549,7 @@ authorization-server flow.
 export JOBOPS_HOST=0.0.0.0
 export JOBOPS_AUTH_TOKEN="$(openssl rand -hex 32)"
 export JOBOPS_PUBLIC_BASE_URL="https://jobs.example.ts.net"
-npx jobops start
+npx @mohith_das/jobops start
 ```
 
 **What's protected:** `/mcp`, `/files/*`, `/`. **What's open by design:** `/healthz`
@@ -617,7 +617,7 @@ mkdir -p ~/job-themes/compact
 # TEMPLATES.md for the full placeholder contract.
 
 export JOBOPS_TEMPLATE_DIR=~/job-themes
-npx jobops templates             # lists bundled + user themes
+npx @mohith_das/jobops templates             # lists bundled + user themes
 
 # Then in your MCP chat:
 # render_pdf job_id=... kind=both formats=["pdf","tex"] template="compact" cover_body="..."

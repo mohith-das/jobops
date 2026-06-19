@@ -108,7 +108,7 @@ export async function runDoctorChecks(
         ? { id: `file:${file}`, label: 'Config file', status: 'warn', detail: `${file} present but suspiciously small (${size} bytes) — did you replace the placeholders?` }
         : { id: `file:${file}`, label: 'Config file', status: 'pass', detail: `${file} (${size} bytes)` });
     } else {
-      add({ id: `file:${file}`, label: 'Config file', status: 'fail', detail: `${file} missing`, fix: 'npx jobops init' });
+      add({ id: `file:${file}`, label: 'Config file', status: 'fail', detail: `${file} missing`, fix: 'npx @mohith_das/jobops init' });
     }
   }
 
@@ -253,7 +253,7 @@ export async function runDoctorChecks(
     const v = active ? `v${active.version}` : '';
     switch (status) {
       case 'no_packet':
-        add({ id: 'career_packet', label: 'Career packet', status: 'fail', detail: 'no active career_packet', fix: 'npx jobops init' });
+        add({ id: 'career_packet', label: 'Career packet', status: 'fail', detail: 'no active career_packet', fix: 'npx @mohith_das/jobops init' });
         break;
       case 'packet_chat_edited':
         add({ id: 'career_packet', label: 'Career packet', status: 'pass',
@@ -270,7 +270,7 @@ export async function runDoctorChecks(
         add({ id: 'career_packet', label: 'Career packet',
               status: ctx === 'server' ? 'warn' : 'fail',
               detail: `${v}: cv.md was edited after the last reseed — the packet is stale.`,
-              fix: 'reseed_career_packet (or `npx jobops reseed`)' });
+              fix: 'reseed_career_packet (or `npx @mohith_das/jobops reseed`)' });
         break;
       case 'packet_is_template':
         add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: `${v} still has TODO markers`, fix: 'reseed' });
@@ -280,7 +280,7 @@ export async function runDoctorChecks(
         break;
     }
   } catch {
-    add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: 'check skipped — DB not initialized', fix: 'npx jobops init' });
+    add({ id: 'career_packet', label: 'Career packet', status: 'warn', detail: 'check skipped — DB not initialized', fix: 'npx @mohith_das/jobops init' });
   }
 
   // ── Tally ──
@@ -290,7 +290,7 @@ export async function runDoctorChecks(
   const summary = ctx === 'server'
     ? (ok ? `Server healthy — ${counts.pass} ok, ${counts.warn} warning(s).`
           : `${counts.fail} issue(s) need attention (${counts.warn} warning(s)).`)
-    : (ok ? 'All required checks passed. Run `npx jobops start` to boot.'
+    : (ok ? 'All required checks passed. Run `npx @mohith_das/jobops start` to boot.'
           : `${counts.fail} check(s) failed.`);
 
   return { ok, context: ctx, package: pkgInfo(), counts, checks, summary };
